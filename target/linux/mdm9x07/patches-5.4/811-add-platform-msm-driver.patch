@@ -1,0 +1,17 @@
+--- a/drivers/platform/Makefile
++++ b/drivers/platform/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_OLPC_EC)		+= olpc/
+ obj-$(CONFIG_GOLDFISH)		+= goldfish/
+ obj-$(CONFIG_CHROME_PLATFORMS)	+= chrome/
+ obj-$(CONFIG_SURFACE_PLATFORMS)	+= surface/
++obj-$(CONFIG_ARCH_QCOM)		+= msm/
+--- a/drivers/platform/Kconfig
++++ b/drivers/platform/Kconfig
+@@ -15,3 +15,7 @@ source "drivers/platform/mellanox/Kconfi
+ source "drivers/platform/olpc/Kconfig"
+ 
+ source "drivers/platform/surface/Kconfig"
++
++if ARCH_QCOM
++source "drivers/platform/msm/Kconfig"
++endif

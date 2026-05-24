@@ -1,0 +1,30 @@
+--- a/drivers/mtd/devices/Makefile
++++ b/drivers/mtd/devices/Makefile
+@@ -18,6 +18,7 @@ obj-$(CONFIG_MTD_SST25L)	+= sst25l.o
+ obj-$(CONFIG_MTD_BCM47XXSFLASH)	+= bcm47xxsflash.o
+ obj-$(CONFIG_MTD_ST_SPI_FSM)    += st_spi_fsm.o
+ obj-$(CONFIG_MTD_POWERNV_FLASH)	+= powernv_flash.o
++obj-$(CONFIG_MTD_MSM_QPIC_NAND) += msm_qpic_nand.o
+ 
+ 
+ CFLAGS_docg3.o			+= -I$(src)
+--- a/drivers/mtd/devices/Kconfig
++++ b/drivers/mtd/devices/Kconfig
+@@ -215,4 +215,17 @@ config BCH_CONST_T
+ 	default 4
+ endif
+ 
++config MTD_MSM_QPIC_NAND
++	tristate "MSM QPIC NAND Device Support"
++	depends on MTD && ARCH_QCOM && !MTD_MSM_NAND
++	select CRC16
++	select BITREVERSE
++	select MTD_NAND_IDS
++	default n
++	help
++	  Support for NAND controller in Qualcomm Technologies, Inc.
++	  Parallel Interface controller (QPIC). This new controller
++	  supports BAM mode and BCH error correction mechanism. Based on the
++	  device capabilities either 4 bit or 8 bit BCH ECC will be used.
++
+ endmenu

@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=/usr
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: xmllib
+Description: "Qualcomm XML Library"
+Version: 1.0.0
+Libs: -L${libdir} -lxml
+Cflags: -I${includedir}/xmllib

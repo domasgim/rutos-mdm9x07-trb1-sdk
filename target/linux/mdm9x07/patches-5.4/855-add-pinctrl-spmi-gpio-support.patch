@@ -1,0 +1,10 @@
+--- a/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-spmi-gpio.c
+@@ -1122,6 +1122,7 @@ static const struct of_device_id pmic_gp
+ 	{ .compatible = "qcom,pm8150b-gpio", .data = (void *) 12 },
+ 	/* pm8150l has 12 GPIOs with holes on 7 */
+ 	{ .compatible = "qcom,pm8150l-gpio", .data = (void *) 12 },
++	{ .compatible = "qcom,spmi-gpio", .data = (void *) 6 },
+ 	{ },
+ };
+ 

@@ -1,0 +1,28 @@
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+=
+ obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
+ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
+ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
++obj-$(CONFIG_QCOM_BIMC_BWMON)           += bimc-bwmon.o
+ obj-$(CONFIG_ARM_MEMLAT_MON)            += arm-memlat-mon.o
+ 
+ # DEVFREQ Drivers
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -74,6 +74,15 @@ config DEVFREQ_GOV_PASSIVE
+ 	  through sysfs entries. The passive governor recommends that
+ 	  devfreq device uses the OPP table to get the frequency/voltage.
+ 
++config QCOM_BIMC_BWMON
++        tristate "QCOM BIMC Bandwidth monitor hardware"
++        depends on ARCH_QCOM
++        help
++          The BIMC Bandwidth monitor hardware allows for monitoring the
++          traffic coming from each master port connected to the BIMC. It also
++          has the capability to raise an IRQ when the count exceeds a
++          programmable limit.
++
+ config ARM_MEMLAT_MON
+         tristate "ARM CPU Memory Latency monitor hardware"
+         depends on ARCH_QCOM

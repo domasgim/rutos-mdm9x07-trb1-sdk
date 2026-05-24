@@ -1,0 +1,35 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -35,6 +35,7 @@ obj-$(CONFIG_QCOM_SCM) += scm.o scm-boot
+ obj-$(CONFIG_MSM_PIL) += peripheral-loader.o
+ obj-$(CONFIG_MSM_PIL_MSS_QDSP6V5) += pil-q6v5.o pil-msa.o pil-q6v5-mss.o
+ obj-$(CONFIG_MSM_PIL_SSR_GENERIC) += subsys-pil-tz.o
++obj-$(CONFIG_QCOM_BUS_SCALING) += msm_bus/
+ 
+ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
+        obj-y += subsystem_notif.o
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -289,6 +289,22 @@ config MSM_PIL_MSS_QDSP6V5
+ 
+          If unsure, say N.
+ 
++config QCOM_BUS_SCALING    
++        bool "Bus scaling driver"
++        help
++        This option enables bus scaling on MSM devices.  Bus scaling
++        allows devices to request the clocks be set to rates sufficient
++        for the active devices needs without keeping the clocks at max
++        frequency when a slower speed is sufficient.
++
++config BUS_TOPOLOGY_ADHOC
++        bool "ad-hoc bus scaling topology"
++        help
++                This option enables a driver that can handle adhoc bus topologies.
++                Adhoc bus topology driver allows one to many connections and maintains
++                directionality of connections by explicitly listing device connections
++                thus avoiding illegal routes.
++
+ config MSM_SUBSYSTEM_RESTART
+        bool "MSM Subsystem Restart"
+        help

@@ -1,0 +1,470 @@
+#include <dt-bindings/input/input.h>
+#include "mdm9607.dtsi"
+#include "platform_name.dtsi"
+
+/ {
+	model = "Teltonika TRB14X";
+	compatible = "teltonika,trb14x", "qcom,mdm9607";
+	qcom,board-id = <8 0>;
+
+	reserved-memory {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges;
+
+		/* 64 KiB reserved for ramoops/pstore */
+		ramoops@8fff0000 {
+			compatible = "ramoops";
+			reg = <0x8fff0000 0x10000>;
+			record-size = <0x2000>;
+			console-size = <0x3800>;
+			pmsg-size = <0x800>;
+			no-map;
+		};
+	};
+
+	gpio-export {
+		compatible = "gpio-export";
+		#size-cells = <0>;
+
+		gpio_sim_select {
+			gpio-export,name = "sim_sel";
+			gpio-export,output = <0>;
+			gpios = <&pm8019_gpios 1 GPIO_ACTIVE_HIGH>;
+			tlt-mnf,device = "TRB145";
+			tlt-mnf,device,weak;
+			tlt-mnf,hwver = <1100 9999>;
+		};
+	};
+
+	leds {
+		compatible = "gpio-leds";
+
+		led_gen_2 {
+			label = "mob_gen_2";
+			gpios = <&tlmm_pinmux 76 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_gen_3 {
+			label = "mob_gen_3";
+			gpios = <&tlmm_pinmux 77 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_gen_4 {
+			label = "mob_gen_4";
+			gpios = <&tlmm_pinmux 79 GPIO_ACTIVE_HIGH>;
+		};
+
+		led_ssid_1 {
+			label = "mob_ssid_1";
+			gpios = <&tlmm_pinmux 25 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+
+		led_ssid_2 {
+			label = "mob_ssid_2";
+			gpios = <&tlmm_pinmux 10 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+
+		led_ssid_3 {
+			label = "mob_ssid_3";
+			gpios = <&tlmm_pinmux 42 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+
+		led_ssid_4 {
+			label = "mob_ssid_4";
+			gpios = <&tlmm_pinmux 11 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+
+		led_ssid_5 {
+			label = "mob_ssid_5";
+			gpios = <&tlmm_pinmux 24 GPIO_ACTIVE_HIGH>;
+			linux,default-trigger = "timer";
+		};
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+
+		reset {
+			gpios = <&tlmm_pinmux 34 GPIO_ACTIVE_LOW>;
+			linux,code = <KEY_RESTART>;
+		};
+	};
+
+	tlt_gpios { // Modify according to wiki page "DTS syntax with Libgpiod changes"
+		gpiochip_info {
+			hw_0 {
+				hwver = <0>;
+				gpiochip_count = <3>;
+
+				gpiochip_0 = <80>; // Built-in
+				gpiochip_1 = <6>;  // Built-in
+				gpiochip_2 = <6>;  // Built-in
+			};
+		};
+
+		ioman {
+			GPIO_13 {
+				line_name = "GPIO_IN_1";
+				active_low;
+			};
+			GPIO_16 {
+				line_name = "GPIO_OUT_1";
+			};
+			GPIO_17 {
+				line_name = "GPIO_IN_2";
+				active_low;
+			};
+			GPIO_78 {
+				line_name = "GPIO_OUT_2";
+			};
+			GPIO_80 {
+				compatible_model_0 = "TRB141";
+				line_name_0 = "GPIO_ONEWIRE";
+
+				compatible_model_1 = "TRB145";
+				compatible_versions_1 = <11 99>;
+				line_name_1 = "GPIO_SIM_SELECT";
+			};
+			GPIO_83 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_ISOLATED_INPUT";
+				active_low;
+			};
+			GPIO_12 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_DWI_TOGGLE_1";
+			};
+			GPIO_14 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_DWI_INPUT_1";
+			};
+			GPIO_15 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_DWI_INPUT_2";
+			};
+			GPIO_20 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_RELAY_OPEN_1";
+			};
+			GPIO_21 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_RELAY_CLOSE_2";
+			};
+			GPIO_22 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_RELAY_CLOSE_1";
+			};
+			GPIO_23 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_RELAY_OPEN_2";
+			};
+			GPIO_26 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_ACL";
+			};
+			GPIO_38 {
+				compatible_model = "TRB141";
+				line_name = "GPIO_DWI_TOGGLE_2";
+			};
+		};
+
+		misc {
+			GPIO_75 {
+				compatible_model = "TRB142";
+				line_name = "GPIO_RS232_DSR";
+			};
+			GPIO_5 {
+				compatible_model = "TRB145";
+				line_name = "GPIO_RS485_RX_EN";
+			};
+			GPIO_4 {
+				compatible_model = "TRB142";
+				line_name = "GPIO_RS232_DCD";
+			};
+		};
+	};
+
+	ioman {
+		layout@0 {
+			compatible = "TRB140,TRB142,TRB143,TRB145";
+
+			io@0 { // 4pin #3
+				label = "dio0";
+				block_type = BLOCK_4PIN;
+				block_pin = "3";
+				default_direction = "out";
+				gpio_in = "GPIO_IN_1";
+				gpio_out = "GPIO_OUT_1";
+				io_param = "g0";
+			};
+			io@1 { // 4pin #4
+				label = "dio1";
+				block_type = BLOCK_4PIN;
+				block_pin = "4";
+				default_direction = "in";
+				gpio_in = "GPIO_IN_2";
+				gpio_out = "GPIO_OUT_2";
+				io_param = "g1";
+			};
+			thermal@0 {
+				label = "temp";
+				list = "0,1,2,3,4";
+			};
+		};
+		layout@1 {
+			compatible = "TRB141";
+
+			io@0 { // 4pin #3
+				label = "dio0";
+				block_type = BLOCK_4PIN;
+				block_pin = "3";
+				default_direction = "out";
+				gpio_in = "GPIO_IN_1";
+				gpio_out = "GPIO_OUT_1";
+				io_param = "g4";
+			};
+			io@1 { // 4pin #4
+				label = "dio1";
+				block_type = BLOCK_4PIN;
+				block_pin = "4";
+				default_direction = "in";
+				gpio_in = "GPIO_IN_2";
+				gpio_out = "GPIO_OUT_2";
+				io_param = "g5";
+			};
+			io@2 {
+				label = "onewire";
+				block_type = BLOCK_16PIN;
+				block_pin = "15";
+				default_direction = "out";
+				default_state = "1";
+				gpio_out = "GPIO_ONEWIRE";
+			};
+			io@3 {
+				label ="iio";
+				block_type = BLOCK_16PIN;
+				block_pin = "8,16";
+				gpio_in = "GPIO_ISOLATED_INPUT";
+				io_param = "g6";
+				counter_support = "0"; // Hardware incompatibility
+			};
+			relay@0 {
+				label = "relay0";
+				block_type = BLOCK_16PIN;
+				block_pin = "3,4,5";
+				default_state = "open";
+				gpio_open = "GPIO_RELAY_OPEN_1";
+				gpio_close = "GPIO_RELAY_CLOSE_1";
+				io_param = "g7";
+			};
+			relay@1 {
+				label = "relay1";
+				block_type = BLOCK_16PIN;
+				block_pin = "11,12,13";
+				default_state = "closed";
+				web_str = "Latching Relay";
+				gpio_open = "GPIO_RELAY_OPEN_2";
+				gpio_close = "GPIO_RELAY_CLOSE_2";
+				io_param = "g8";
+			};
+			dwi@0 {
+				label = "dwi0";
+				block_type = BLOCK_16PIN;
+				block_pin = "1";
+				default_state = "dry";
+				dwi_input = "GPIO_DWI_INPUT_1";
+				dwi_toggle = "GPIO_DWI_TOGGLE_1";
+				io_param = "g2";
+			};
+			dwi@1 {
+				label = "dwi1";
+				block_type = BLOCK_16PIN;
+				block_pin = "2";
+				default_state = "wet";
+				dwi_input = "GPIO_DWI_INPUT_2";
+				dwi_toggle = "GPIO_DWI_TOGGLE_2";
+				io_param = "g3";
+			};
+			adc@0 {
+				label = "adc0";
+				block_type = BLOCK_16PIN;
+				block_pin = "7";
+				tolerance = "0.05";
+				path = "in_voltage35_input";
+				io_param = "g1";
+				adc_cof@0 {
+					divider ="126582.278481013"; //1000000.0 / 7.9
+				};
+			};
+			acl@0 {
+				label = "acl0";
+				block_type = BLOCK_16PIN;
+				block_pin = "7";
+				tolerance = "0.00004";
+				path = "in_voltage37_input";
+				gpio_out = "GPIO_ACL";
+				io_param = "g0";
+				adc_cof@0 {
+					divider ="120000000"; //120.0 * 1000000.0
+				};
+			};
+			thermal@0 {
+				label = "temp";
+				list = "0,1,2,3,4";
+			};
+		};
+	};
+
+	config: config_partition {
+		label = "mnf_info";
+	};
+
+	mnfinfo: mnfinfo {
+		compatible = "sysfs-mnfinfo";
+		status = "okay";
+		#address-cells = <2>;
+		#size-cells = <1>;
+
+		mac {
+			reg = <&config 0x50 0xc>;
+			default = "001E42013370";
+			min-res-len = <0xc>;
+			type = "ascii";
+			log;
+		};
+
+		maceth {
+			reg = <&config 0x50 0xc>;
+			default = "001E42013371";
+			min-res-len = <0xc>;
+			type = "maceth_ascii";
+		};
+
+		serial {
+			reg = <&config 0x10 0x10>;
+			type = "alnum";
+			default = "0000000000";
+			log;
+		};
+
+		name {
+			reg = <&config 0x20 0xc>;
+			type = "ascii";
+			default = "UNKNOWNXXXXX";
+			log;
+		};
+
+		hwver {
+			reg = <&config 0x30 0x4>;
+			type = "digit";
+			default = "0000";
+			log;
+		};
+
+		branch {
+			reg = <&config 0x38 0x4>;
+			type = "ascii";
+			default = "";
+			log;
+		};
+
+		hwver_lo {
+			reg = <&config 0x34 0x4>;
+			type = "digit";
+			default = "0000";
+			log;
+		};
+
+		batch {
+			reg = <&config 0x40 0x4>;
+			type = "digit";
+			default = "0000";
+			log;
+		};
+
+		mob_cfg {
+			reg = <&config 0x66 0x4>;
+			type = "digit";
+			default = "0000";
+			sec;
+		};
+
+		simpin1 {
+			reg = <&config 0x70 0x10>;
+			type = "digit";
+			default = "";
+			sec;
+		};
+
+		pass {
+			reg = <&config 0x80 0x6a>;
+			type = "ascii";
+			sec;
+		};
+
+		sim_cfg {
+			reg = <&config 0xF0 0x20>;
+			type = "simcfg";
+			default = "0110000";
+			log;
+		};
+
+		profiles {
+			reg = <&config 0x110 0x80>;
+			type = "ascii";
+			default = "";
+		};
+
+		sim_count {
+			default =  "1";
+			log;
+		};
+	};
+};
+
+&watchdog {
+	status = "ok";
+};
+
+&blsp1_uart5 {
+	status = "ok";
+};
+
+&blsp1_uart3 {
+	status = "ok";
+	tlt-mnf,device = "TRB145", "TRB142", "TRB143";
+	tlt-mnf,device,weak;
+	linux,rs485-enabled-at-boot-time;
+	rs485-rx-during-tx;
+	qcom,rts-gpio = <&tlmm_pinmux 26 0x00>;
+};
+
+&i2c_2 {
+	status = "ok";
+};
+
+&spi_6 {
+	status = "ok";
+};
+
+&usb_otg {
+	status = "ok";
+};
+
+&emac0 {
+	status = "ok";
+	tlt-mnf,device = "TRB143", "TRB140";
+    /* This lets tlt-mnf,device check to pass if device name is not retrieved
+	due to early probing of driver if device name is not passed by bootloader */
+	tlt-mnf,device,weak;
+	phy0: ethernet-phy@0 {
+		reg = <0>;
+		phy-mode = "sgmii";
+	};
+};
+

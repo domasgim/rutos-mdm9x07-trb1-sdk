@@ -1,0 +1,70 @@
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -170,9 +170,13 @@ static irqreturn_t emac_isr(int _irq, vo
+ 	if (status & TX_PKT_INT)
+ 		emac_mac_tx_process(adpt, &adpt->tx_q);
+ 
+-	if (status & ISR_OVER)
++	if (status & ISR_OVER) {
+ 		net_warn_ratelimited("%s: TX/RX overflow interrupt\n",
+ 				     adpt->netdev->name);
++		adpt->ovf_timer.mask = irq->mask;
++		mod_timer(&adpt->ovf_timer.timer, jiffies + 1);
++		return IRQ_HANDLED;
++	}
+ 
+ exit:
+ 	/* enable the interrupt */
+@@ -820,6 +824,13 @@ static int msm_emac_ldo_init(struct plat
+ 	return 0;
+ }
+ 
++static void ovf_timer_callback(struct timer_list *t) {
++	struct timer_data *ovf_timer = from_timer(ovf_timer, t, timer);
++	struct emac_adapter *adpt =
++		container_of(ovf_timer, struct emac_adapter, ovf_timer);
++	writel(ovf_timer->mask, adpt->base + EMAC_INT_MASK);
++}
++
+ static int emac_probe(struct platform_device *pdev)
+ {
+ 	struct net_device *netdev;
+@@ -953,6 +964,8 @@ static int emac_probe(struct platform_de
+ 		goto err_undo_napi;
+ 	}
+ 
++	timer_setup(&adpt->ovf_timer.timer, ovf_timer_callback, 0);
++
+ 	reg =  readl_relaxed(adpt->base + EMAC_DMA_MAS_CTRL);
+ 	devid = (reg & DEV_ID_NUM_BMSK)  >> DEV_ID_NUM_SHFT;
+ 	revid = (reg & DEV_REV_NUM_BMSK) >> DEV_REV_NUM_SHFT;
+@@ -990,6 +1003,7 @@ static int emac_remove(struct platform_d
+ 
+ 	unregister_netdev(netdev);
+ 	netif_napi_del(&adpt->rx_q.napi);
++	del_timer_sync(&adpt->ovf_timer.timer);
+ 
+ 	free_irq(adpt->irq.irq, &adpt->irq);
+ 	cancel_work_sync(&adpt->work_thread);
+--- a/drivers/net/ethernet/qualcomm/emac/emac.h
++++ b/drivers/net/ethernet/qualcomm/emac/emac.h
+@@ -336,6 +336,11 @@ struct emac_regulator {
+ 	bool	enabled;
+ };
+ 
++struct timer_data {
++	struct timer_list timer;
++	u32 mask;
++};
++
+ /* The device's main data structure */
+ struct emac_adapter {
+ 	struct net_device		*netdev;
+@@ -399,6 +404,7 @@ struct emac_adapter {
+ 	struct pinctrl_state		*ephy_pins_sleep;
+ 	int	(*gpio_on)(struct emac_adapter *adpt, bool mdio, bool ephy);
+ 	int	(*gpio_off)(struct emac_adapter *adpt, bool mdio, bool ephy);
++	struct timer_data		ovf_timer;
+ };
+ 
+ int emac_reinit_locked(struct emac_adapter *adpt);

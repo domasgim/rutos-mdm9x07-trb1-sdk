@@ -1,0 +1,4 @@
+{
+	"user": "mbus_client",
+	"publish": [ "mbus_client.*" ]
+}

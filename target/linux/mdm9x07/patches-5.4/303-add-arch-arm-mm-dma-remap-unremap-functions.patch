@@ -1,0 +1,115 @@
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -62,6 +62,13 @@ struct arm_dma_free_args {
+ #define NORMAL	    0
+ #define COHERENT    1
+ 
++static void *arm_dma_remap(struct device *dev, void *cpu_addr,
++                        dma_addr_t handle, size_t size,
++                        unsigned long attrs);
++
++static void arm_dma_unremap(struct device *dev, void *remapped_addr,
++                                size_t size);
++
+ struct arm_dma_allocator {
+ 	void *(*alloc)(struct arm_dma_alloc_args *args,
+ 		       struct page **ret_page);
+@@ -195,6 +202,8 @@ const struct dma_map_ops arm_dma_ops = {
+ 	.sync_sg_for_device	= arm_dma_sync_sg_for_device,
+ 	.dma_supported		= arm_dma_supported,
+ 	.get_required_mask	= dma_direct_get_required_mask,
++        .remap                  = arm_dma_remap,
++        .unremap                = arm_dma_unremap,
+ };
+ EXPORT_SYMBOL(arm_dma_ops);
+ 
+@@ -807,6 +816,42 @@ static int __arm_dma_mmap(struct device
+ 	return ret;
+ }
+ 
++static void *arm_dma_remap(struct device *dev, void *cpu_addr,
++                        dma_addr_t handle, size_t size,
++                        unsigned long attrs)   
++{
++        void *ptr;
++        struct page *page = pfn_to_page(dma_to_pfn(dev, handle));
++        pgprot_t prot = __get_dma_pgprot(attrs, false);
++        unsigned long offset = handle & ~PAGE_MASK;
++        
++        size = PAGE_ALIGN(size + offset);
++        ptr = dma_common_contiguous_remap(page, size, prot,
++                        __builtin_return_address(0));         
++        return ptr ? ptr + offset : ptr;
++}
++
++static void arm_dma_unremap(struct device *dev, void *remapped_addr,
++                                size_t size)
++{
++        unsigned int flags = VM_DMA_COHERENT;
++        struct vm_struct *area;
++        
++        size = PAGE_ALIGN(size);
++        remapped_addr = (void *)((unsigned long)remapped_addr & PAGE_MASK);
++
++        area = find_vm_area(remapped_addr);
++        if (!area || (area->flags & flags) != flags) {
++                WARN(1, "trying to free invalid coherent area: %p\n",
++                        remapped_addr);
++                return;
++        }
++        
++        vunmap(remapped_addr);
++        flush_tlb_kernel_range((unsigned long)remapped_addr,
++                        (unsigned long)(remapped_addr + size));
++}
++
+ /*
+  * Create userspace mapping for the DMA-coherent memory.
+  */
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -132,6 +132,10 @@ struct dma_map_ops {
+ 	u64 (*get_required_mask)(struct device *dev);
+ 	size_t (*max_mapping_size)(struct device *dev);
+ 	unsigned long (*get_merge_boundary)(struct device *dev);
++	void *(*remap)(struct device *dev, void *cpu_addr, dma_addr_t handle,
++			size_t size, unsigned long attrs);
++	void (*unremap)(struct device *dev, void *remapped_address,
++			size_t size);
+ };
+ 
+ #define DMA_MAPPING_ERROR		(~(dma_addr_t)0)
+@@ -735,6 +739,33 @@ static inline void dma_free_coherent(str
+ 	return dma_free_attrs(dev, size, cpu_addr, dma_handle, 0);
+ }
+ 
++static inline void *dma_remap(struct device *dev, void *cpu_addr, 
++                dma_addr_t dma_handle, size_t size, unsigned long attrs)
++{
++        const struct dma_map_ops *ops = get_dma_ops(dev);
++
++        if (!ops->remap) {
++                WARN_ONCE(1, "Remap function not implemented for %pS\n",
++                                ops->remap);
++                return NULL;
++        }
++                           
++        return ops->remap(dev, cpu_addr, dma_handle, size, attrs);
++}
++ 
++static inline void dma_unremap(struct device *dev, void *remapped_addr,
++                                size_t size)
++{
++        const struct dma_map_ops *ops = get_dma_ops(dev);
++ 
++        if (!ops->unremap) {
++                WARN_ONCE(1, "unremap function not implemented for %pS\n",
++                                ops->unremap);
++                return;
++        }
++        
++        return ops->unremap(dev, remapped_addr, size);
++}
+ 
+ static inline u64 dma_get_mask(struct device *dev)
+ {

@@ -1,0 +1,58 @@
+--- a/drivers/net/ethernet/qualcomm/emac/emac-sgmii.h
++++ b/drivers/net/ethernet/qualcomm/emac/emac-sgmii.h
+@@ -42,6 +42,7 @@ int emac_sgmii_config(struct platform_de
+ int emac_sgmii_init_fsm9900(struct emac_adapter *adpt);
+ int emac_sgmii_init_qdf2432(struct emac_adapter *adpt);
+ int emac_sgmii_init_qdf2400(struct emac_adapter *adpt);
++int emac_sgmii_init_mdm9607(struct emac_adapter *adpt);
+ 
+ int emac_sgmii_init(struct emac_adapter *adpt);
+ int emac_sgmii_open(struct emac_adapter *adpt);
+--- a/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac-sgmii.c
+@@ -291,6 +291,14 @@ static struct sgmii_ops qdf2400_ops = {
+ };
+ #endif
+ 
++static struct sgmii_ops mdm9607_ops = {
++	.init = emac_sgmii_init_mdm9607,
++	.open = emac_sgmii_common_open,
++	.close = emac_sgmii_common_close,
++	.link_change = emac_sgmii_common_link_change,
++	.reset = emac_sgmii_common_reset,
++};
++
+ static int emac_sgmii_acpi_match(struct device *dev, void *data)
+ {
+ #ifdef CONFIG_ACPI
+@@ -343,6 +351,10 @@ static const struct of_device_id emac_sg
+ 		.compatible = "qcom,qdf2432-emac-sgmii",
+ 		.data = &qdf2432_ops,
+ 	},
++	{
++		.compatible = "qcom,mdm9607-emac-sgmii",
++		.data = &mdm9607_ops,
++	},
+ 	{}
+ };
+ 
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -589,6 +589,9 @@ static const struct of_device_id emac_dt
+ 	{
+ 		.compatible = "qcom,fsm9900-emac",
+ 	},
++	{
++		.compatible = "qcom,mdm9607-emac",
++	},
+ 	{}
+ };
+ MODULE_DEVICE_TABLE(of, emac_dt_match);
+--- a/drivers/net/ethernet/qualcomm/emac/Makefile
++++ b/drivers/net/ethernet/qualcomm/emac/Makefile
+@@ -7,4 +7,4 @@ obj-$(CONFIG_QCOM_EMAC) += qcom-emac.o
+ 
+ qcom-emac-objs := emac.o emac-mac.o emac-phy.o emac-sgmii.o emac-ethtool.o \
+ 		  emac-sgmii-fsm9900.o emac-sgmii-qdf2432.o \
+-		  emac-sgmii-qdf2400.o
++		  emac-sgmii-qdf2400.o emac-sgmii-mdm9607.o

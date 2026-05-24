@@ -1,0 +1,11 @@
+menu "Target options and settings"
+depends on TARGET_mdm9x07
+
+config DEFAULT_TARGET_OPTIONS
+	bool
+	default y
+	select KERNEL_DYNAMIC_DEBUG
+	select KERNEL_MTD_UBI
+	select KERNEL_MTD_UBI_BLOCK
+
+endmenu

@@ -1,0 +1,24 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -29,3 +29,4 @@ obj-$(CONFIG_MSM_SMEM)  +=smem.o smem_st
+ obj-$(CONFIG_MSM_SMD)   += smd.o smd_private.o smd_init_dt.o smsm_debug.o
+ obj-$(CONFIG_MSM_SPM) += msm-spm.o spm_devices.o
+ obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
++obj-$(CONFIG_MSM_IPC_ROUTER_SMD_XPRT) += ipc_router_smd_xprt.o
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -249,4 +249,14 @@ config MSM_BAM_DMUX
+           provides a means to support more logical channels
+           via muxing than BAM could without muxing.
+ 
++config MSM_IPC_ROUTER_SMD_XPRT
++        depends on MSM_SMD 
++        depends on IPC_ROUTER
++        bool "MSM SMD XPRT Layer"   
++        help
++          SMD Transport Layer that enables IPC Router communication within
++          a System-on-Chip(SoC). When the SMD channels become available,
++          this layer registers a transport with IPC Router and enable
++          message exchange.
++
+ endmenu

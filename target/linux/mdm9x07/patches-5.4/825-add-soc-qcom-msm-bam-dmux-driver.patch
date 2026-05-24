@@ -1,0 +1,23 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -28,3 +28,4 @@ obj-$(CONFIG_QCOM_RPM_SMD_LEGACY) += rpm
+ obj-$(CONFIG_MSM_SMEM)  +=smem.o smem_state.o
+ obj-$(CONFIG_MSM_SMD)   += smd.o smd_private.o smd_init_dt.o smsm_debug.o
+ obj-$(CONFIG_MSM_SPM) += msm-spm.o spm_devices.o
++obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -240,4 +240,13 @@ config MSM_SPM
+ 	  configuring SPM to allow different low power modes for both core and  
+ 	  L2.
+ 
++config MSM_BAM_DMUX
++        bool "BAM Data Mux Driver"
++        depends on SPS
++        help
++          Support Muxed Data Channels over BAM interface.
++          BAM has a limited number of pipes.  This driver
++          provides a means to support more logical channels
++          via muxing than BAM could without muxing.
++
+ endmenu

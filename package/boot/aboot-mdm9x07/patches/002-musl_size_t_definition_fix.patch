@@ -1,0 +1,13 @@
+--- a/include/sys/types.h 2020-03-05 14:02:35.653406285 +0200
++++ b/include/sys/types.h 2020-03-05 14:02:47.876622915 +0200
+@@ -42,9 +42,6 @@
+ typedef unsigned int u_int;
+ typedef unsigned long u_long;
+ 
+-#ifndef _SIZE_T_DEFINED_
+-typedef unsigned long size_t;
+-#endif
+ typedef long          ssize_t;
+ typedef long long     off_t;
+
+

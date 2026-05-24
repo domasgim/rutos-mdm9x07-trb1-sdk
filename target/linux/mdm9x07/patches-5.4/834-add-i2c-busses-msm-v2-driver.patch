@@ -1,0 +1,30 @@
+--- a/drivers/i2c/busses/Makefile
++++ b/drivers/i2c/busses/Makefile
+@@ -122,6 +122,7 @@ obj-$(CONFIG_I2C_XILINX)	+= i2c-xiic.o
+ obj-$(CONFIG_I2C_XLR)		+= i2c-xlr.o
+ obj-$(CONFIG_I2C_XLP9XX)	+= i2c-xlp9xx.o
+ obj-$(CONFIG_I2C_RCAR)		+= i2c-rcar.o
++obj-$(CONFIG_I2C_MSM_V2)        += i2c-msm-v2.o
+ obj-$(CONFIG_I2C_ZX2967)	+= i2c-zx2967.o
+ 
+ # External I2C/SMBus adapter drivers
+--- a/drivers/i2c/busses/Kconfig
++++ b/drivers/i2c/busses/Kconfig
+@@ -1400,6 +1400,17 @@ config I2C_OPAL
+ 	  This driver can also be built as a module. If so, the module will be
+ 	  called as i2c-opal.
+ 
++config I2C_MSM_V2
++        tristate "I2C_MSM_V2"
++        depends on ARCH_QCOM
++        help
++          If you say yes to this option, support will be included for the
++          built-in I2C interface and its DMA engine on the MSM family
++          processors.
++          
++          This driver can also be built as a module.  If so, the module
++          will be called i2c-msm-v2.
++
+ config I2C_ZX2967
+ 	tristate "ZTE ZX2967 I2C support"
+ 	depends on ARCH_ZX

@@ -1,0 +1,31 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -36,4 +36,11 @@ obj-$(CONFIG_MSM_PIL) += peripheral-load
+ obj-$(CONFIG_MSM_PIL_MSS_QDSP6V5) += pil-q6v5.o pil-msa.o pil-q6v5-mss.o
+ obj-$(CONFIG_MSM_PIL_SSR_GENERIC) += subsys-pil-tz.o
+ 
++ifdef CONFIG_MSM_SUBSYSTEM_RESTART
++       obj-y += subsystem_notif.o
++       obj-y += subsystem_restart.o
++       obj-y += ramdump.o
++       obj-y += microdump_collector.o
++endif
++
+ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -289,4 +289,14 @@ config MSM_PIL_MSS_QDSP6V5
+ 
+          If unsure, say N.
+ 
++config MSM_SUBSYSTEM_RESTART
++       bool "MSM Subsystem Restart"
++       help
++         This option enables the MSM subsystem restart framework.
++        
++         The MSM subsystem restart framework provides support to boot,
++         shutdown, and restart subsystems with a reference counted API.
++         It also notifies userspace of transitions between these states via
++         sysfs.
++
+ endmenu

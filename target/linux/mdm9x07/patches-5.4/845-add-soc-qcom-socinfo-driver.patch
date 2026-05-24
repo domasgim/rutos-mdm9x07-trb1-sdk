@@ -1,0 +1,29 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -44,6 +44,7 @@ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
+        obj-y += microdump_collector.o
+ endif
+ 
++obj-$(CONFIG_QCOM_SOC_INFO) += socinfo.o
+ obj-$(CONFIG_MSM_BOOT_STATS) += boot_stats.o
+ obj-$(CONFIG_MSM_BOOT_TIME_MARKER) += boot_marker.o
+ 
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -315,6 +315,16 @@ config MSM_SUBSYSTEM_RESTART
+          It also notifies userspace of transitions between these states via
+          sysfs.
+ 
++config QCOM_SOC_INFO
++        bool "Chip information for QTI SoCs"
++        depends on SOC_BUS    
++        default y
++        help
++          This driver provides information about the SoC and chip information such
++          as the chip ID and revision. Information includes decoding the chip name
++          based on the chip ID and querying the SoC revision. This information is
++          loaded by the bootloader into SMEM during the boot up process.
++
+ config MSM_BOOT_STATS
+         bool "Use MSM boot stats reporting"
+         help

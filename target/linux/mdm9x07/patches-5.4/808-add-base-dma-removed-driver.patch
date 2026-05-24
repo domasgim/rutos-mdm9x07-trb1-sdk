@@ -1,0 +1,53 @@
+--- a/drivers/base/Makefile
++++ b/drivers/base/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_PINCTRL) += pinctrl.o
+ obj-$(CONFIG_DEV_COREDUMP) += devcoredump.o
+ obj-$(CONFIG_GENERIC_MSI_IRQ_DOMAIN) += platform-msi.o
+ obj-$(CONFIG_GENERIC_ARCH_TOPOLOGY) += arch_topology.o
++obj-$(CONFIG_HAVE_GENERIC_DMA_COHERENT) += dma-removed.o
+ 
+ obj-y			+= test/
+ 
+--- a/init/Kconfig
++++ b/init/Kconfig
+@@ -2273,3 +2273,6 @@ config ARCH_HAS_SYNC_CORE_BEFORE_USERMOD
+ # <asm/syscall_wrapper.h>.
+ config ARCH_HAS_SYSCALL_WRAPPER
+ 	def_bool n
++
++config HAVE_GENERIC_DMA_COHERENT
++        bool
+--- a/include/linux/device.h
++++ b/include/linux/device.h
+@@ -1288,6 +1288,7 @@ struct device {
+ 	struct cma *cma_area;		/* contiguous memory area for dma
+ 					   allocations */
+ #endif
++	struct removed_region *removed_mem;
+ 	/* arch specific additions */
+ 	struct dev_archdata	archdata;
+ 
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -78,6 +78,11 @@
+ #define DMA_ATTR_STRONGLY_ORDERED       (1UL << 11)
+ 
+ /*
++ * DMA_ATTR_SKIP_ZEROING: Do not zero mapping.
++ */
++#define DMA_ATTR_SKIP_ZEROING           (1UL << 10)
++
++/*
+  * A dma_addr_t can hold any valid DMA or bus address for the platform.
+  * It can be given to a device to use as a DMA source or target.  A CPU cannot
+  * reference a dma_addr_t directly because there may be translation between
+--- a/include/linux/of_reserved_mem.h
++++ b/include/linux/of_reserved_mem.h
+@@ -15,6 +15,7 @@ struct reserved_mem {
+ 	phys_addr_t			base;
+ 	phys_addr_t			size;
+ 	void				*priv;
++	int				fixup;
+ };
+ 
+ struct reserved_mem_ops {

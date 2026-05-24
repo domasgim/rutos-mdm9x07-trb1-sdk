@@ -1,0 +1,31 @@
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -55,6 +55,7 @@ obj-$(CONFIG_SERIAL_VR41XX) += vr41xx_si
+ obj-$(CONFIG_SERIAL_ATMEL) += atmel_serial.o
+ obj-$(CONFIG_SERIAL_UARTLITE) += uartlite.o
+ obj-$(CONFIG_SERIAL_MSM) += msm_serial.o
++obj-$(CONFIG_SERIAL_MSM_HS) += msm_serial_hs.o
+ obj-$(CONFIG_SERIAL_QCOM_GENI) += qcom_geni_serial.o
+ obj-$(CONFIG_SERIAL_OMAP) += omap-serial.o
+ obj-$(CONFIG_SERIAL_ALTERA_UART) += altera_uart.o
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -969,6 +969,18 @@ config SERIAL_MSM_CONSOLE
+ 	select SERIAL_CORE_CONSOLE
+ 	select SERIAL_EARLYCON
+ 
++config SERIAL_MSM_HS    
++        tristate "MSM UART High Speed: Serial Driver"
++        depends on ARCH_QCOM
++        select SERIAL_CORE
++        help
++          If you have a machine based on MSM family of SoCs, you
++          can enable its onboard high speed serial port by enabling    
++          this option.
++
++          Choose M here to compile it as a module. The module will be
++          called msm_serial_hs.
++
+ config SERIAL_QCOM_GENI
+ 	tristate "QCOM on-chip GENI based serial port support"
+ 	depends on ARCH_QCOM || COMPILE_TEST

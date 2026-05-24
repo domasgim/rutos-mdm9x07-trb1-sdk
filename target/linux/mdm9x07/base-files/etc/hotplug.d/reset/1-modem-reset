@@ -1,0 +1,7 @@
+#!/bin/sh
+
+[ "$ACTION" = "change" ] && [ "$SUBSYSTEM" = "modem" ] && [ "$DRIVER" = "pil-q6v5-mss" ] && {
+	# Add any logic that suppose to run after modem restart.
+	# E.g. restart programs that use rs232/rs485 on trb143/trb145, etc.
+}
+

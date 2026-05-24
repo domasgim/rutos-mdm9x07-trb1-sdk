@@ -1,0 +1,239 @@
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -22,6 +22,7 @@
+ #include <linux/reboot.h>
+ #include <linux/pm.h>
+ #include <linux/log2.h>
++#include <linux/workqueue.h>
+ 
+ #include "../core.h"
+ #include "../pinconf.h"
+@@ -33,6 +34,50 @@
+ #define PS_HOLD_OFFSET 0x820
+ #define TLMM_EBI2_EMMC_GPIO_CFG 0x111000
+ 
++#define MSM_MONITOR_POLL_RATE HZ / 100
++
++static int msm_monitored_gpios[] = { 10, 11, 24, 25, 42, 76, 77, 79 };
++
++enum msm_pin_value {
++	MSM_PIN_VALUE_UNSET = 0,
++	MSM_PIN_VALUE_ZERO,
++	MSM_PIN_VALUE_ONE,
++};
++
++static enum msm_pin_value msm_int_to_val(int val)
++{
++	switch (val) {
++	default:
++	case 0:
++		return MSM_PIN_VALUE_ZERO;
++	case 1:
++		return MSM_PIN_VALUE_ONE;
++	}
++}
++
++static int msm_val_to_int(enum msm_pin_value val)
++{
++	switch (val) {
++	default:
++	case MSM_PIN_VALUE_UNSET:
++	case MSM_PIN_VALUE_ZERO:
++		return 0;
++	case MSM_PIN_VALUE_ONE:
++		return 1;
++	}
++}
++
++enum msm_pin_direction {
++	MSM_PIN_DIR_UNSET = 0,
++	MSM_PIN_DIR_IN,
++	MSM_PIN_DIR_OUT,
++};
++
++struct msm_pin_state {
++	enum msm_pin_value val;
++	enum msm_pin_direction dir;
++};
++
+ /**
+  * struct msm_pinctrl - state for a pinctrl-msm device
+  * @dev:            device handle.
+@@ -65,6 +110,10 @@ struct msm_pinctrl {
+ 
+ 	const struct msm_pinctrl_soc_data *soc;
+ 	void __iomem *regs[MAX_NR_TILES];
++
++	bool monitor_enable;
++	struct msm_pin_state pin_map[MAX_NR_GPIO];
++	struct delayed_work monitor_work;
+ };
+ 
+ #define MSM_ACCESSOR(name) \
+@@ -429,37 +478,41 @@ static const struct pinconf_ops msm_pinc
+ 	.pin_config_group_set	= msm_config_group_set,
+ };
+ 
+-static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
+-{
++static void _msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset) {
+ 	const struct msm_pingroup *g;
+ 	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
+-	unsigned long flags;
+ 	u32 val;
+ 
+ 	g = &pctrl->soc->groups[offset];
+ 
+-	raw_spin_lock_irqsave(&pctrl->lock, flags);
+-
+ 	val = msm_readl_ctl(pctrl, g);
+ 	val &= ~BIT(g->oe_bit);
+ 	msm_writel_ctl(val, pctrl, g);
++}
++
++static int msm_gpio_direction_input(struct gpio_chip *chip, unsigned offset)
++{
++	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&pctrl->lock, flags);
++
++	pctrl->pin_map[offset].dir = MSM_PIN_DIR_IN;
++	_msm_gpio_direction_input(chip, offset);
+ 
+ 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
+ 
+ 	return 0;
+ }
+ 
+-static int msm_gpio_direction_output(struct gpio_chip *chip, unsigned offset, int value)
++static void _msm_gpio_direction_output(struct gpio_chip *chip, unsigned offset, int value)
+ {
+ 	const struct msm_pingroup *g;
+ 	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
+-	unsigned long flags;
+ 	u32 val;
+ 
+ 	g = &pctrl->soc->groups[offset];
+ 
+-	raw_spin_lock_irqsave(&pctrl->lock, flags);
+-
+ 	val = msm_readl_io(pctrl, g);
+ 	if (value)
+ 		val |= BIT(g->out_bit);
+@@ -470,6 +523,19 @@ static int msm_gpio_direction_output(str
+ 	val = msm_readl_ctl(pctrl, g);
+ 	val |= BIT(g->oe_bit);
+ 	msm_writel_ctl(val, pctrl, g);
++}
++
++static int msm_gpio_direction_output(struct gpio_chip *chip, unsigned offset, int value)
++{
++	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&pctrl->lock, flags);
++
++	pctrl->pin_map[offset].dir = MSM_PIN_DIR_OUT;
++	pctrl->pin_map[offset].val = msm_int_to_val(value);
++
++	_msm_gpio_direction_output(chip, offset, value);
+ 
+ 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
+ 
+@@ -502,25 +568,56 @@ static int msm_gpio_get(struct gpio_chip
+ 	return !!(val & BIT(g->in_bit));
+ }
+ 
++static void _msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
++{
++	_msm_gpio_direction_output(chip, offset, value);
++}
++
+ static void msm_gpio_set(struct gpio_chip *chip, unsigned offset, int value)
+ {
+-	const struct msm_pingroup *g;
+ 	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
+ 	unsigned long flags;
+-	u32 val;
+ 
+-	g = &pctrl->soc->groups[offset];
++	raw_spin_lock_irqsave(&pctrl->lock, flags);
++
++	pctrl->pin_map[offset].dir = MSM_PIN_DIR_OUT;
++	pctrl->pin_map[offset].val = msm_int_to_val(value);
++
++	_msm_gpio_set(chip, offset, value);
++
++	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
++}
++
++static void msm_monitor_gpios(struct work_struct *work)
++{
++	struct delayed_work *monitor_work = to_delayed_work(work);
++	struct msm_pinctrl *pctrl	  = container_of(monitor_work, struct msm_pinctrl, monitor_work);
++	unsigned long flags;
++	unsigned i;
+ 
+ 	raw_spin_lock_irqsave(&pctrl->lock, flags);
+ 
+-	val = msm_readl_io(pctrl, g);
+-	if (value)
+-		val |= BIT(g->out_bit);
+-	else
+-		val &= ~BIT(g->out_bit);
+-	msm_writel_io(val, pctrl, g);
++	for (i = 0; i < ARRAY_SIZE(msm_monitored_gpios); i++) {
++		unsigned ofs = msm_monitored_gpios[i];
++		struct msm_pin_state *state = &(pctrl->pin_map[ofs]);
++
++		switch (state->dir) {
++		case MSM_PIN_DIR_IN:
++			_msm_gpio_direction_input(&(pctrl->chip), ofs);
++			break;
++		case MSM_PIN_DIR_OUT:
++			_msm_gpio_direction_output(&(pctrl->chip), ofs, msm_val_to_int(state->val));
++			break;
++		default:
++			break;
++		}
++	}
+ 
+ 	raw_spin_unlock_irqrestore(&pctrl->lock, flags);
++
++	if (pctrl->monitor_enable) {
++		schedule_delayed_work(monitor_work, MSM_MONITOR_POLL_RATE);
++	}
+ }
+ 
+ #ifdef CONFIG_DEBUG_FS
+@@ -946,7 +1043,7 @@ static int msm_gpio_irq_reqres(struct ir
+ 	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+ 	struct msm_pinctrl *pctrl = gpiochip_get_data(gc);
+ 	int ret;
+-
++	
+ 	if (!try_module_get(gc->owner))
+ 		return -ENODEV;
+ 
+@@ -1220,6 +1317,10 @@ int msm_pinctrl_probe(struct platform_de
+ 
+ 	platform_set_drvdata(pdev, pctrl);
+ 
++	pctrl->monitor_enable = true;
++	INIT_DELAYED_WORK(&(pctrl->monitor_work), msm_monitor_gpios);
++	schedule_delayed_work(&(pctrl->monitor_work), MSM_MONITOR_POLL_RATE);
++
+ 	dev_dbg(&pdev->dev, "Probed Qualcomm pinctrl driver\n");
+ 
+ 	return 0;
+@@ -1230,6 +1331,9 @@ int msm_pinctrl_remove(struct platform_d
+ {
+ 	struct msm_pinctrl *pctrl = platform_get_drvdata(pdev);
+ 
++	pctrl->monitor_enable = false;
++	cancel_delayed_work_sync(&(pctrl->monitor_work));
++
+ 	gpiochip_remove(&pctrl->chip);
+ 
+ 	unregister_restart_handler(&pctrl->restart_nb);

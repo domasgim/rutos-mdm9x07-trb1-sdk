@@ -1,0 +1,125 @@
+diff --git a/app/aboot/fastboot.c b/app/aboot/fastboot.c
+index 545a24d..4a057f4 100755
+--- a/app/aboot/fastboot.c
++++ b/app/aboot/fastboot.c
+@@ -42,6 +42,10 @@
+ #include <usb30_udc.h>
+ #endif
+ 
++#ifdef USE_FASTBOOT_LED_IND
++extern int dev_led_work(void);
++#endif
++
+ typedef struct
+ {
+ 	int (*udc_init)(struct udc_device *devinfo);
+@@ -539,6 +543,17 @@ again:
+ 	free(buffer);
+ }
+ 
++#ifdef USE_FASTBOOT_LED_IND
++static int led_ind_handler(void *arg)
++{
++	for (;;) {
++		dev_led_work();
++		thread_sleep(FASTBOOT_LED_IND_TIME);
++	}
++	return 0;
++}
++#endif
++
+ static int fastboot_handler(void *arg)
+ {
+ 	for (;;) {
+@@ -559,6 +574,9 @@ int fastboot_init(void *base, unsigned size)
+ {
+ 	char sn_buf[13];
+ 	thread_t *thr;
++#ifdef USE_FASTBOOT_LED_IND
++	thread_t *led_thr;
++#endif
+ 	dprintf(INFO, "fastboot_init()\n");
+ 
+ 	download_base = base;
+@@ -644,6 +662,15 @@ int fastboot_init(void *base, unsigned size)
+ 		goto fail_alloc_in;
+ 	}
+ 	thread_resume(thr);
++#ifdef USE_FASTBOOT_LED_IND
++	led_thr = thread_create("led_ind", led_ind_handler, 0, DEFAULT_PRIORITY, 4096);
++	if (!led_thr)
++	{
++		printf("Unable to create led indication thread!\n");
++	} else {
++		thread_resume(led_thr);
++	}
++#endif
+ 
+ 	usb_if.udc_start();
+ 
+diff --git a/target/mdm9607/init.c b/target/mdm9607/init.c
+index a487ce7..88532f8 100755
+--- a/target/mdm9607/init.c
++++ b/target/mdm9607/init.c
+@@ -98,6 +98,34 @@ static struct ptable flash_ptable;
+ 
+ struct qpic_nand_init_config config;
+ 
++#ifdef USE_FASTBOOT_LED_IND
++/* Array of GPIO that controls signal strength leds. */
++static int sig_arr[] = { 25, 10, 42, 11, 24 };
++
++#define SIG_ARR_LEN (sizeof(sig_arr) / sizeof(sig_arr[0]))
++
++void dev_led_setup(void)
++{
++	int i;
++
++	for (i = 0; i < SIG_ARR_LEN; i++) {
++		gpio_tlmm_config(sig_arr[i], 0, GPIO_OUTPUT, GPIO_PULL_DOWN,
++				 GPIO_2MA, GPIO_ENABLE);
++		gpio_set_val(sig_arr[i], GPIO_ENABLE);
++	}
++}
++
++int dev_led_work(void)
++{
++	int i;
++	uint32_t stat = gpio_status(sig_arr[0]);
++
++	for (i = 0; i < SIG_ARR_LEN; i++) {
++		gpio_set_val(sig_arr[i], !stat);
++	}
++}
++#endif
++
+ void update_ptable_names(void)
+ {
+ 	uint32_t ptn_index;
+@@ -173,6 +201,10 @@ void target_init(void)
+ 	uint32_t base_addr;
+ 	uint8_t slot;
+ 
++#ifdef USE_FASTBOOT_LED_IND
++	dev_led_setup();
++#endif
++
+ 	dprintf(INFO, "target_init()\n");
+ 
+ 	spmi_init(PMIC_ARB_CHANNEL_NUM, PMIC_ARB_OWNER_ID);
+diff --git a/target/mdm9607/rules.mk b/target/mdm9607/rules.mk
+index 2a5340b..1ef3857 100755
+--- a/target/mdm9607/rules.mk
++++ b/target/mdm9607/rules.mk
+@@ -23,7 +23,10 @@ SCRATCH_REGION_SIZE_256                 := 0x08000000  # 128MB
+ 
+ BASE_ADDR                               := 0x80000000
+ 
+-DEFINES += NO_KEYPAD_DRIVER=1
++DEFINES += \
++       NO_KEYPAD_DRIVER=1 \
++       USE_FASTBOOT_LED_IND=1 \
++       FASTBOOT_LED_IND_TIME=500
+ 
+ MODULES += \
+ 	dev/keys \

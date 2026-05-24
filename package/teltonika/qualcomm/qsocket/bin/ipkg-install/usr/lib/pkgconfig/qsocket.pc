@@ -1,0 +1,10 @@
+prefix=/usr
+exec_prefix=/usr
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: qsocket
+Description: QSocket library
+Version: 1.0.0
+Libs: -L${libdir} -lqsocket
+Cflags: -I${includedir}/qsocket

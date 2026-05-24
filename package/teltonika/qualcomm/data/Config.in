@@ -1,0 +1,8 @@
+menu "Configuration"
+	depends on PACKAGE_data
+
+config DATA_QTI
+	bool "Include QTI service"
+	default y if TARGET_sdxprairie || TARGET_sdxlemur || TARGET_sdxnightjar || TARGET_sdxpinn
+
+endmenu

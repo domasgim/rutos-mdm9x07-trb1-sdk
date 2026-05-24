@@ -1,0 +1,17 @@
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -118,3 +118,4 @@ endif
+ obj-$(CONFIG_ARCH_ZX)			+= zte/
+ obj-$(CONFIG_ARCH_ZYNQ)			+= zynq/
+ obj-$(CONFIG_COMMON_CLK_ZYNQMP)         += zynqmp/
++obj-$(CONFIG_ARCH_QCOM)			+= msm/
+--- a/include/linux/clkdev.h
++++ b/include/linux/clkdev.h
+@@ -19,6 +19,7 @@ struct clk_lookup {
+ 	struct list_head	node;
+ 	const char		*dev_id;
+ 	const char		*con_id;
++	int			of_idx;
+ 	struct clk		*clk;
+ 	struct clk_hw		*clk_hw;
+ };

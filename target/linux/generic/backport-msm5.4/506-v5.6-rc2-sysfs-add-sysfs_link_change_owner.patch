@@ -1,0 +1,93 @@
+From 0666a3aee762cd4f7981c2eed0fd8cab87533539 Mon Sep 17 00:00:00 2001
+From: Christian Brauner <christian.brauner@ubuntu.com>
+Date: Thu, 27 Feb 2020 04:37:12 +0100
+Subject: [PATCH 501/503] sysfs: add sysfs_link_change_owner()
+
+Add a helper to change the owner of a sysfs link.
+This function will be used to correctly account for kobject ownership
+changes, e.g. when moving network devices between network namespaces.
+
+Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Christian Brauner <christian.brauner@ubuntu.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ fs/sysfs/file.c       | 41 +++++++++++++++++++++++++++++++++++++++++
+ include/linux/sysfs.h | 10 ++++++++++
+ 2 files changed, 51 insertions(+)
+
+--- a/fs/sysfs/file.c
++++ b/fs/sysfs/file.c
+@@ -574,6 +574,47 @@ static int internal_change_owner(struct
+ }
+ 
+ /**
++ *	sysfs_link_change_owner - change owner of a sysfs file.
++ *	@kobj:	object of the kernfs_node the symlink is located in.
++ *	@targ:	object of the kernfs_node the symlink points to.
++ *	@name:	name of the link.
++ *	@kuid:	new owner's kuid
++ *	@kgid:	new owner's kgid
++ *
++ * This function looks up the sysfs symlink entry @name under @kobj and changes
++ * the ownership to @kuid/@kgid. The symlink is looked up in the namespace of
++ * @targ.
++ *
++ * Returns 0 on success or error code on failure.
++ */
++int sysfs_link_change_owner(struct kobject *kobj, struct kobject *targ,
++			    const char *name, kuid_t kuid, kgid_t kgid)
++{
++	struct kernfs_node *kn = NULL;
++	int error;
++
++	if (!name || !kobj->state_in_sysfs || !targ->state_in_sysfs)
++		return -EINVAL;
++
++	error = -ENOENT;
++	kn = kernfs_find_and_get_ns(kobj->sd, name, targ->sd->ns);
++	if (!kn)
++		goto out;
++
++	error = -EINVAL;
++	if (kernfs_type(kn) != KERNFS_LINK)
++		goto out;
++	if (kn->symlink.target_kn->priv != targ)
++		goto out;
++
++	error = internal_change_owner(kn, kuid, kgid);
++
++out:
++	kernfs_put(kn);
++	return error;
++}
++
++/**
+  *	sysfs_file_change_owner - change owner of a sysfs file.
+  *	@kobj:	object.
+  *	@name:	name of the file to change.
+--- a/include/linux/sysfs.h
++++ b/include/linux/sysfs.h
+@@ -317,6 +317,8 @@ int sysfs_emit_at(char *buf, int at, con
+ 
+ int sysfs_file_change_owner(struct kobject *kobj, const char *name, kuid_t kuid,
+ 			    kgid_t kgid);
++int sysfs_link_change_owner(struct kobject *kobj, struct kobject *targ,
++			    const char *name, kuid_t kuid, kgid_t kgid);
+ 
+ #else /* CONFIG_SYSFS */
+ 
+@@ -545,6 +547,14 @@ static inline int sysfs_file_change_owne
+ 					  const char *name, kuid_t kuid,
+ 					  kgid_t kgid)
+ {
++	return 0;
++}
++
++static inline int sysfs_link_change_owner(struct kobject *kobj,
++					  struct kobject *targ,
++					  const char *name, kuid_t kuid,
++					  kgid_t kgid)
++{
+ 	return 0;
+ }
+ 

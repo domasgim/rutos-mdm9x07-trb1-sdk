@@ -1,0 +1,27 @@
+--- a/drivers/net/ethernet/qualcomm/Makefile
++++ b/drivers/net/ethernet/qualcomm/Makefile
+@@ -12,3 +12,4 @@ qcauart-objs := qca_uart.o
+ obj-y += emac/
+ 
+ obj-$(CONFIG_RMNET) += rmnet/
++obj-$(CONFIG_MSM_RMNET_BAM) += msm_rmnet_bam.o
+--- a/drivers/net/ethernet/qualcomm/Kconfig
++++ b/drivers/net/ethernet/qualcomm/Kconfig
+@@ -62,4 +62,17 @@ config QCOM_EMAC
+ 
+ source "drivers/net/ethernet/qualcomm/rmnet/Kconfig"
+ 
++config MSM_RMNET_BAM
++        bool "RMNET BAM Driver"
++        default n
++        help
++          Implements RMNET over BAM interface.
++          RMNET provides a virtual ethernet interface
++          for routing IP packets within the MSM using
++          BAM as a physical transport.
++
++config MSM_RMNET_DEBUG
++        bool "MSM RMNET debug interface"
++        default n
++
+ endif # NET_VENDOR_QUALCOMM

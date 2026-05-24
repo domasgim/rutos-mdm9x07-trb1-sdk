@@ -1,0 +1,126 @@
+--- a/drivers/regulator/core.c
++++ b/drivers/regulator/core.c
+@@ -20,6 +20,8 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/of.h>
+ #include <linux/regmap.h>
++#include <linux/seq_file.h>
++#include <linux/uaccess.h>
+ #include <linux/regulator/of_regulator.h>
+ #include <linux/regulator/consumer.h>
+ #include <linux/regulator/coupler.h>
+@@ -511,6 +513,15 @@ int regulator_check_voltage(struct regul
+ 		return -EPERM;
+ 	}
+ 
++	/* check if requested voltage range actually overlaps the constraints */
++	if (*max_uV < rdev->constraints->min_uV ||
++	    *min_uV > rdev->constraints->max_uV) {
++		rdev_err(rdev, "requested voltage range [%d, %d] does not fit "
++			"within constraints: [%d, %d]\n", *min_uV, *max_uV,
++			rdev->constraints->min_uV, rdev->constraints->max_uV);
++		return -EINVAL;
++	}
++
+ 	if (*max_uV > rdev->constraints->max_uV)
+ 		*max_uV = rdev->constraints->max_uV;
+ 	if (*min_uV < rdev->constraints->min_uV)
+@@ -540,6 +551,8 @@ int regulator_check_consumers(struct reg
+ {
+ 	struct regulator *regulator;
+ 	struct regulator_voltage *voltage;
++	int init_min_uV = *min_uV;
++	int init_max_uV = *max_uV;
+ 
+ 	list_for_each_entry(regulator, &rdev->consumer_list, list) {
+ 		voltage = &regulator->voltage[state];
+@@ -550,6 +563,14 @@ int regulator_check_consumers(struct reg
+ 		if (!voltage->min_uV && !voltage->max_uV)
+ 			continue;
+ 
++		if (init_max_uV < voltage->min_uV
++		    || init_min_uV > voltage->max_uV)
++			rdev_err(rdev, "requested voltage range [%d, %d] does "
++				"not fit within previously voted range: "
++				"[%d, %d]\n", init_min_uV, init_max_uV,
++				voltage->min_uV, voltage->max_uV);
++
++
+ 		if (*max_uV > voltage->max_uV)
+ 			*max_uV = voltage->max_uV;
+ 		if (*min_uV < voltage->min_uV)
+@@ -986,7 +1007,7 @@ static int drms_uA_update(struct regulat
+ {
+ 	struct regulator *sibling;
+ 	int current_uA = 0, output_uV, input_uV, err;
+-	unsigned int mode;
++	unsigned int regulator_curr_mode, mode;
+ 
+ 	/*
+ 	 * first check to see if we can set modes at all, otherwise just
+@@ -1043,6 +1064,14 @@ static int drms_uA_update(struct regulat
+ 
+ 		/* check the new mode is allowed */
+ 		err = regulator_mode_constrain(rdev, &mode);
++		/* return if the same mode is requested */
++		if (rdev->desc->ops->get_mode) {
++			regulator_curr_mode = rdev->desc->ops->get_mode(rdev);
++			if (regulator_curr_mode == mode)
++				return err;
++		} else
++			return err;
++
+ 		if (err < 0) {
+ 			rdev_err(rdev, "failed to get optimum mode @ %d uA %d -> %d uV\n",
+ 				 current_uA, input_uV, output_uV);
+@@ -3134,6 +3163,40 @@ int regulator_list_hardware_vsel(struct
+ EXPORT_SYMBOL_GPL(regulator_list_hardware_vsel);
+ 
+ /**
++ * regulator_list_corner_voltage - return the maximum voltage in microvolts that
++ *      can be physically configured for the regulator when operating at the
++ *      specified voltage corner
++ * @regulator: regulator source
++ * @corner: voltage corner value
++ * Context: can sleep
++ *
++ * This function can be used for regulators which allow scaling between
++ * different voltage corners as opposed to be different absolute voltages.  The
++ * absolute voltage for a given corner may vary part-to-part or for a given part
++ * at runtime based upon various factors.
++ *
++ * Returns a voltage corresponding to the specified voltage corner or a negative
++ * errno if the corner value can't be used on this system.
++ */
++int regulator_list_corner_voltage(struct regulator *regulator, int corner)
++{
++        struct regulator_dev *rdev = regulator->rdev;
++        int ret;
++
++        if (corner < rdev->constraints->min_uV ||
++            corner > rdev->constraints->max_uV ||
++            !rdev->desc->ops->list_corner_voltage)
++                return -EINVAL;
++
++        regulator_lock(rdev);
++        ret = rdev->desc->ops->list_corner_voltage(rdev, corner);
++        regulator_unlock(rdev);
++
++        return ret;
++}
++EXPORT_SYMBOL(regulator_list_corner_voltage);
++
++/**
+  * regulator_get_linear_step - return the voltage step size between VSEL values
+  * @regulator: regulator source
+  *
+--- a/include/linux/regulator/consumer.h
++++ b/include/linux/regulator/consumer.h
+@@ -240,6 +240,7 @@ void regulator_bulk_free(int num_consume
+ 
+ int regulator_count_voltages(struct regulator *regulator);
+ int regulator_list_voltage(struct regulator *regulator, unsigned selector);
++int regulator_list_corner_voltage(struct regulator *regulator, int corner);
+ int regulator_is_supported_voltage(struct regulator *regulator,
+ 				   int min_uV, int max_uV);
+ unsigned int regulator_get_linear_step(struct regulator *regulator);

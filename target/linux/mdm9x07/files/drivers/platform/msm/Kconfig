@@ -1,0 +1,46 @@
+menu "Qualcomm MSM specific device drivers"
+	depends on ARCH_QCOM
+
+config QPNP_REVID
+        tristate "QPNP Revision ID Peripheral"
+        depends on SPMI
+        help
+          Say 'y' here to include support for the Qualcomm Technologies, Inc.
+          QPNP REVID peripheral. REVID prints out the PMIC type and revision
+          numbers in the kernel log along with the PMIC option status. The PMIC
+          type is mapped to a QTI chip part number and logged as well.
+
+config SPS
+	bool "SPS support"
+	select GENERIC_ALLOCATOR
+	help
+	  The SPS (Smart Peripheral Switch) is a DMA engine.
+	  It can move data in the following modes:
+		1. Peripheral-to-Peripheral.
+		2. Peripheral-to-Memory.
+		3. Memory-to-Memory.
+
+config SPS_SUPPORT_NDP_BAM
+	bool "SPS support NDP BAM"
+	depends on SPS
+	help
+	  No-Data-Path BAM is used to improve BAM performance.
+
+config GPIO_USB_DETECT
+        tristate "GPIO-based USB VBUS Detection"
+        depends on POWER_SUPPLY
+        help
+          This driver supports external USB VBUS detection circuitry whose
+          output is connected to a GPIO. The driver in turn notifies the   
+          USB driver of VBUS presence/disconnection using the power_supply
+          framework.
+
+config USB_BAM
+        bool "USB BAM Driver"
+        depends on SPS && USB_GADGET
+        help
+          Enabling this option adds USB BAM Driver.
+          USB BAM driver was added to supports SPS Peripheral-to-Peripheral
+          transfers between the USB and other peripheral.
+
+endmenu

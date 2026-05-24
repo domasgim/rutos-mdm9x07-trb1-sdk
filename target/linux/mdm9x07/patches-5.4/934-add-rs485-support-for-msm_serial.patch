@@ -1,0 +1,215 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -263,6 +263,9 @@ struct msm_hs_port {
+ 	void *ipc_msm_hs_log_ctxt;
+ 	void *ipc_msm_hs_pwr_ctxt;
+ 	int ipc_debug_mask;
++	struct hrtimer	stop_rts_timer; /* "rs485 stop rts" timer 	*/
++	unsigned long	bit_time;	/* for holding bit time */
++
+ #ifdef QUECTEL_UART_SUSPEND
+ 	atomic_t wlock_count;
+ 	struct mutex wlock_mutex;
+@@ -451,7 +454,7 @@ static void msm_hs_resource_vote(struct
+ 	atomic_inc(&msm_uport->wlock_count);
+ 	__pm_stay_awake(msm_uport->serial_ws);
+ 	mutex_unlock(&msm_uport->wlock_mutex);
+-	
++
+ 	if (msm_uport->pm_state != MSM_HS_PM_ACTIVE) {
+ 		msm_hs_pm_resume(uport->dev);
+ 	}
+@@ -1117,6 +1120,7 @@ static void msm_hs_set_bps_locked(struct
+ 	 * changing any protocol configuration. Here Baud rate and stale
+ 	 * timeout are getting updated. Hence reset transmitter and receiver.
+ 	 */
++	msm_uport->bit_time = 1000000000 / bps; //bit time in ns
+ 	msm_hs_write(uport, UART_DM_CR, RESET_TX);
+ 	msm_hs_write(uport, UART_DM_CR, RESET_RX);
+ }
+@@ -1398,6 +1402,12 @@ static void msm_hs_stop_tx_locked(struct
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 	struct msm_hs_tx *tx = &msm_uport->tx;
+ 
++	if (uport->rs485.flags & SER_RS485_ENABLED ) {
++		hrtimer_start(&msm_uport->stop_rts_timer,
++			ns_to_ktime(msm_uport->bit_time)
++				, HRTIMER_MODE_REL);
++	}
++
+ 	tx->flush = FLUSH_STOP;
+ }
+ 
+@@ -1528,15 +1538,32 @@ static void msm_hs_submit_tx_locked(stru
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 	struct msm_hs_tx *tx = &msm_uport->tx;
+ 	struct circ_buf *tx_buf = &msm_uport->uport.state->xmit;
++	struct platform_device *pdev = to_platform_device(uport->dev);
++	const struct msm_serial_hs_platform_data *pdata =
++					pdev->dev.platform_data;
+ 	struct sps_pipe *sps_pipe_handle;
++	unsigned int data;
+ 	int ret;
+ 
++
+ 	if (uart_circ_empty(tx_buf) || uport->state->port.tty->stopped) {
+ 		tx->dma_in_flight = false;
+ 		msm_hs_stop_tx_locked(uport);
+ 		return;
+ 	}
+ 
++	if (uport->rs485.flags & SER_RS485_ENABLED ) {
++		if (!(uport->rs485.flags & SER_RS485_RX_DURING_TX)) {
++			/* Disable UARTDM RX BAM Interface */
++			data = msm_hs_read(uport, UART_DM_DMEN);
++			data &= ~UARTDM_RX_BAM_ENABLE_BMSK;
++			msm_hs_write(uport, UART_DM_DMEN, data);
++		}
++
++		gpio_set_value(pdata->uart_rts_gpio,
++			uport->rs485.flags & SER_RS485_RTS_ON_SEND);
++	}
++
+ 	tx_count = uart_circ_chars_pending(tx_buf);
+ 
+ 	if (tx_count > UARTDM_TX_BUF_SIZE)
+@@ -2595,6 +2622,10 @@ static void msm_hs_unconfig_uart_gpios(s
+ 			gpio_free(pdata->uart_rfr_gpio);
+ 	} else
+ 		MSM_HS_ERR("%s(): Error:Pdata is NULL\n", __func__);
++
++	if (pdata && gpio_is_valid(pdata->uart_rts_gpio))
++			gpio_free(pdata->uart_rts_gpio);
++
+ }
+ 
+ /**
+@@ -2609,6 +2640,17 @@ static int msm_hs_config_uart_gpios(stru
+ 	int ret = 0;
+ 	struct msm_hs_port *msm_uport = UARTDM_TO_MSM(uport);
+ 
++	if (pdata) {
++		if (gpio_is_valid(pdata->uart_rts_gpio)) {
++			ret = gpio_request(pdata->uart_rts_gpio,
++							"UART_RTS_GPIO");
++			if (unlikely(ret)) {
++				MSM_HS_ERR("gpio request failed for:%d\n",
++					pdata->uart_rts_gpio);
++			}
++		}
++	}
++
+ 	if (!IS_ERR_OR_NULL(msm_uport->pinctrl)) {
+ 		MSM_HS_DBG("%s(): Using Pinctrl\n", __func__);
+ 		msm_uport->use_pinctrl = true;
+@@ -2989,6 +3031,12 @@ struct msm_serial_hs_platform_data
+ 	if (pdata->uart_rfr_gpio < 0)
+ 		pr_err("uart_rfr_gpio is not available\n");
+ 
++	/* UART RTS GPIO */
++	pdata->uart_rts_gpio = of_get_named_gpio(node,
++					"qcom,rts-gpio", 0);
++	if (pdata->uart_rts_gpio < 0)
++		pr_err("uart_rts_gpio is not available\n");
++
+ 	pdata->no_suspend_delay = of_property_read_bool(node,
+ 				"qcom,no-suspend-delay");
+ 
+@@ -3449,7 +3497,6 @@ static int msm_hs_pm_sys_resume(struct d
+ 	if (atomic_read(&msm_uport->startup_count) > 0) {
+ 		ret = msm_hs_pm_resume(dev);
+ 	}
+-	
+ 	return ret;
+ }
+ #endif
+@@ -3486,6 +3533,71 @@ static int msm_hs_runtime_resume(struct
+ static void  msm_serial_hs_rt_init(struct uart_port *uport) {}
+ #endif
+ 
++/**
++ * msm_rs485_config() - generic ->rs485_config() callback
++ * @port: uart port
++ * @rs485: rs485 settings
++ *
++ * Generic callback usable by uart drivers to activate rs485 settings
++ * if the uart is incapable of driving RTS .
++ */
++static int msm_rs485_config(struct uart_port *port, struct serial_rs485 *rs485)
++{
++	/* pick sane settings if the user hasn't */
++	if (!!(rs485->flags & SER_RS485_RTS_ON_SEND) ==
++	    !!(rs485->flags & SER_RS485_RTS_AFTER_SEND)) {
++		rs485->flags |= SER_RS485_RTS_ON_SEND;
++		rs485->flags &= ~SER_RS485_RTS_AFTER_SEND;
++	}
++
++	/* clamp the delays to [0, 100ms] */
++	rs485->delay_rts_before_send = min(rs485->delay_rts_before_send, 100U);
++	rs485->delay_rts_after_send  = min(rs485->delay_rts_after_send, 100U);
++	/* TODO: implement delays before and after RTS */
++
++	memset(rs485->padding, 0, sizeof(rs485->padding));
++	port->rs485 = *rs485;
++
++	return 0;
++}
++
++static enum hrtimer_restart msm_rs485_handle_stop_rts(struct hrtimer *t)
++{
++	struct msm_hs_port *msm_uport = container_of(t, struct msm_hs_port,
++			stop_rts_timer);
++	struct platform_device *pdev = to_platform_device(msm_uport->uport.dev);
++	const struct msm_serial_hs_platform_data *pdata =
++					pdev->dev.platform_data;
++	unsigned long flags;
++	unsigned int data;
++	int ret = HRTIMER_NORESTART;
++
++	spin_lock_irqsave(&msm_uport->uport.lock, flags);
++	data = msm_hs_read(&msm_uport->uport, UART_DM_SR);
++
++	if (data & UARTDM_SR_TXEMT_BMSK) {
++		gpio_set_value(pdata->uart_rts_gpio,
++			msm_uport->uport.rs485.flags & SER_RS485_RTS_AFTER_SEND);
++	} else {
++		hrtimer_forward(&msm_uport->stop_rts_timer,
++			hrtimer_cb_get_time(&msm_uport->stop_rts_timer),
++				ktime_set(0, ns_to_ktime(msm_uport->bit_time))
++		);
++		ret = HRTIMER_RESTART;
++	}
++
++	if (!(msm_uport->uport.rs485.flags & SER_RS485_RX_DURING_TX)) {
++		/* Ensable UARTDM RX BAM Interface */
++		data = msm_hs_read(&msm_uport->uport, UART_DM_DMEN);
++		data |= UARTDM_RX_BAM_ENABLE_BMSK;
++		msm_hs_write(&msm_uport->uport, UART_DM_DMEN, data);
++	}
++
++
++	spin_unlock_irqrestore(&msm_uport->uport.lock, flags);
++
++	return ret;
++}
+ 
+ static int msm_hs_probe(struct platform_device *pdev)
+ {
+@@ -3652,6 +3764,17 @@ static int msm_hs_probe(struct platform_
+ 	uport->uartclk = 7372800;
+ 	msm_uport->imr_reg = 0x0;
+ 
++
++	hrtimer_init(&msm_uport->stop_rts_timer, CLOCK_MONOTONIC,
++		     HRTIMER_MODE_REL);
++	msm_uport->stop_rts_timer.function = &msm_rs485_handle_stop_rts;
++
++	uport->rs485_config = msm_rs485_config;
++
++	if (msm_uport->uport.dev) {
++		uart_get_rs485_mode(msm_uport->uport.dev, &uport->rs485);
++	}
++
+ 	msm_uport->clk = clk_get(&pdev->dev, "core_clk");
+ 	if (IS_ERR(msm_uport->clk)) {
+ 		ret = PTR_ERR(msm_uport->clk);

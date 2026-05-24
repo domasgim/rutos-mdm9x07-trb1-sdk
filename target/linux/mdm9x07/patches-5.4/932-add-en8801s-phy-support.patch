@@ -1,0 +1,114 @@
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -430,6 +430,11 @@ config MOTORCOMM_PHY
+ 	---help---
+ 	  Supports the YT8010, YT8510, YT8511, YT8512 PHYs.
+ 
++config AIROHA_EN8801S_PHY
++	tristate "Drivers for Airoha EN8801S Gigabit PHYs"
++	---help---
++	  Currently supports the Airoha EN8801S PHY.
++
+ config DAVICOM_PHY
+ 	tristate "Davicom PHYs"
+ 	---help---
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -54,6 +54,7 @@ obj-$(CONFIG_MDIO_MOXART)	+= mdio-moxart
+ obj-$(CONFIG_MDIO_MSCC_MIIM)	+= mdio-mscc-miim.o
+ obj-$(CONFIG_MDIO_OCTEON)	+= mdio-octeon.o
+ obj-$(CONFIG_MOTORCOMM_PHY)	+= motorcomm.o
++obj-$(CONFIG_AIROHA_EN8801S_PHY)	+= en8801s.o
+ obj-$(CONFIG_MDIO_SUN4I)	+= mdio-sun4i.o
+ obj-$(CONFIG_MDIO_THUNDER)	+= mdio-thunder.o
+ obj-$(CONFIG_MDIO_XGENE)	+= mdio-xgene.o
+@@ -110,3 +111,4 @@ obj-$(CONFIG_STE10XP)		+= ste10Xp.o
+ obj-$(CONFIG_TERANETICS_PHY)	+= teranetics.o
+ obj-$(CONFIG_VITESSE_PHY)	+= vitesse.o
+ obj-$(CONFIG_XILINX_GMII2RGMII) += xilinx_gmii2rgmii.o
++ccflags-y := -DDEBUG
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -31,6 +31,7 @@
+ #include <linux/mdio.h>
+ #include <linux/io.h>
+ #include <linux/uaccess.h>
++#include "en8801s.h"
+ 
+ MODULE_DESCRIPTION("PHY library");
+ MODULE_AUTHOR("Andy Fleming");
+@@ -562,6 +563,9 @@ static int phy_request_driver_module(str
+ {
+ 	int ret;
+ 
++	phydev_info(dev, "Loading PHY driver module for ID 0x%08lx ",
++				(unsigned long)phy_id);
++
+ 	ret = request_module(MDIO_MODULE_PREFIX MDIO_ID_FMT,
+ 			     MDIO_ID_ARGS(phy_id));
+ 	/* We only check for failures in executing the usermode binary,
+@@ -763,6 +767,26 @@ static int get_phy_c45_ids(struct mii_bu
+ 	return 0;
+ }
+ 
++/* EN8801 PBUS write function */
++static void En8801_varPbusRegWr(struct mii_bus *ebus, unsigned long pbus_id,unsigned long pbus_address, unsigned long pbus_data)
++{
++    mdiobus_write(ebus, pbus_id, 0x1F, (unsigned int)(pbus_address >> 6));
++    mdiobus_write(ebus, pbus_id, (unsigned int)((pbus_address >> 2) & 0xf), (unsigned int)(pbus_data & 0xFFFF));
++    mdiobus_write(ebus, pbus_id, 0x10, (unsigned int)(pbus_data >> 16));
++    return;
++}
++
++/* EN8801 PBUS read function */
++static unsigned long En8801_varPbusRegRd(struct mii_bus *ebus, unsigned long pbus_id, unsigned long pbus_address)
++{
++    unsigned int pbus_data_low, pbus_data_high;
++
++    mdiobus_write(ebus, pbus_id, 0x1F, (unsigned int)(pbus_address >> 6));
++    pbus_data_low = mdiobus_read(ebus,  pbus_id, (unsigned int)((pbus_address >> 2) & 0xf));
++    pbus_data_high = mdiobus_read(ebus,  pbus_id, 0x10);
++    return ((unsigned long)pbus_data_high << 16) + pbus_data_low;
++}
++
+ /**
+  * get_phy_id - reads the specified addr for its ID.
+  * @bus: the target MII bus
+@@ -783,10 +807,37 @@ static int get_phy_id(struct mii_bus *bu
+ 		      bool is_c45, struct phy_c45_device_ids *c45_ids)
+ {
+ 	int phy_reg;
++	unsigned long pbus_data;
++	unsigned int pbusAddress;
++	unsigned int retry;
+ 
+ 	if (is_c45)
+ 		return get_phy_c45_ids(bus, addr, phy_id, c45_ids);
+ 
++	pbusAddress = EN8801S_PBUS_DEFAULT_ADDR;
++
++	for (retry = 0; retry < 2; retry++) {
++		pbus_data = En8801_varPbusRegRd(
++			bus, pbusAddress, EN8801S_RG_ETHER_PHY_OUI); /* PHY OUI */
++		if (EN8801S_PBUS_OUI == pbus_data) {
++			pbus_data = En8801_varPbusRegRd(
++				bus, pbusAddress, EN8801S_RG_SMI_ADDR); /* SMI ADDR */
++			pbus_data = (pbus_data & 0xffff0000) |
++				    (unsigned long)(EN8801S_PBUS_PHY_ID << 8) |
++				    (unsigned long)(EN8801S_MDIO_PHY_ID);
++			printk("[Airoha] EN8801S SMI_ADDR=%lx (renew)\n", pbus_data);
++			En8801_varPbusRegWr(bus, pbusAddress,
++					    EN8801S_RG_SMI_ADDR, pbus_data);
++			En8801_varPbusRegWr(bus, EN8801S_PBUS_PHY_ID,
++					    EN8801S_RG_BUCK_CTL, 0x03);
++			mdelay(50);
++			*phy_id = EN8801S_PHY_ID;
++			return 0;
++		} else {
++			pbusAddress = EN8801S_PBUS_PHY_ID;
++		}
++	}
++
+ 	/* Grab the bits from PHYIR1, and put them in the upper half */
+ 	phy_reg = mdiobus_read(bus, addr, MII_PHYSID1);
+ 	if (phy_reg < 0) {

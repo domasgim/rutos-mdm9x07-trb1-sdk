@@ -1,0 +1,1 @@
+{"services/mbus/client":{"description":"m-bus api","read":{"api":{"/mbus/*":["*"],"/serial/status/*":["*"],"/data_to_server/data/config/*":["plugin","id"],"/universal_gateway/status/*":["*"]}},"write":{"api":["/mbus/*"]}},"services/mbus/gateway":{"description":"m-bus gateway api","read":{"api":{"/overip/*":["*"],"/serial/status/*":["*"]}},"write":{"api":["/overip/*"]}}}

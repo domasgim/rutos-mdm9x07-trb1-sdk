@@ -1,0 +1,23 @@
+--- a/drivers/thermal/qcom/Makefile
++++ b/drivers/thermal/qcom/Makefile
+@@ -4,3 +4,4 @@ obj-$(CONFIG_QCOM_TSENS)	+= qcom_tsens.o
+ qcom_tsens-y			+= tsens.o tsens-common.o tsens-v0_1.o \
+ 				   tsens-8960.o tsens-v2.o tsens-v1.o
+ obj-$(CONFIG_QCOM_SPMI_TEMP_ALARM)	+= qcom-spmi-temp-alarm.o
++obj-$(CONFIG_QTI_ADC_TM) += adc-tm.o adc-tm-common.o adc-tm5.o
+--- a/drivers/thermal/qcom/Kconfig
++++ b/drivers/thermal/qcom/Kconfig
+@@ -20,3 +20,13 @@ config QCOM_SPMI_TEMP_ALARM
+ 	  trip points. The temperature reported by the thermal sensor reflects the
+ 	  real time die temperature if an ADC is present or an estimate of the
+ 	  temperature based upon the over temperature stage value.
++
++config QTI_ADC_TM
++        tristate "Qualcomm Technologies Inc. Thermal Monitor ADC Driver"
++        depends on SPMI && THERMAL
++        depends on QCOM_SPMI_ADC5
++        help
++          This enables the thermal Sysfs driver for the ADC thermal monitoring
++          device. It shows up in Sysfs as a thermal zone with multiple trip points.
++          Thermal client sets threshold temperature for both warm and cool  
++          and gets updated when a threshold is reached.

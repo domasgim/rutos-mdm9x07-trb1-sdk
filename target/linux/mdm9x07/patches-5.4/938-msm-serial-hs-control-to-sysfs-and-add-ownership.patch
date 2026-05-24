@@ -1,0 +1,365 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -53,7 +53,6 @@
+ #include <linux/sysfs.h>
+ #include <linux/stat.h>
+ #include <linux/device.h>
+-#include <linux/debugfs.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/of_gpio.h>
+@@ -232,8 +231,6 @@ struct msm_hs_port {
+ 	atomic_t resource_count;
+ 	struct msm_hs_wakeup wakeup;
+ 
+-	struct dentry *loopback_dir;
+-	struct dentry *filter_dir;
+ 	struct work_struct clock_off_w; /* work for actual clock off */
+ 	struct workqueue_struct *hsuart_wq; /* hsuart workqueue */
+ 	struct mutex mtx; /* resource access mutex */
+@@ -297,7 +294,6 @@ static const struct of_device_id msm_hs_
+ #define RX_FLUSH_COMPLETE_TIMEOUT 300 /* In jiffies */
+ #define BLSP_UART_CLK_FMAX 63160000
+ 
+-static struct dentry *debug_base;
+ static struct platform_driver msm_serial_hs_platform_driver;
+ static struct uart_driver msm_hs_driver;
+ static const struct uart_ops msm_hs_ops;
+@@ -534,7 +530,7 @@ static ssize_t set_clock(struct device *
+ 	return ret;
+ }
+ 
+-static DEVICE_ATTR(clock, 0644, show_clock, set_clock);
++static DEVICE_ATTR(clock, 0664, show_clock, set_clock);
+ 
+ static ssize_t show_debug_mask(struct device *dev,
+ 		struct device_attribute *attr, char *buf)
+@@ -573,7 +569,7 @@ static ssize_t set_debug_mask(struct dev
+ 	return count;
+ }
+ 
+-static DEVICE_ATTR(debug_mask, 0644, show_debug_mask,
++static DEVICE_ATTR(debug_mask, 0664, show_debug_mask,
+ 							set_debug_mask);
+ 
+ static void try_hangup_port(struct msm_hs_port *msm_uport)
+@@ -596,7 +592,7 @@ static ssize_t hangup_store(struct devic
+ 	return count;
+ }
+ 
+-static DEVICE_ATTR_WO(hangup);
++static DEVICE_ATTR(hangup, 0220, NULL, hangup_store);
+ 
+ static int modem_restart_notifier_cb(struct notifier_block *this,
+ 				unsigned long code,
+@@ -714,43 +710,21 @@ static void dump_uart_hs_registers(struc
+ 	MSM_HS_DBG("rx.flush:%u\n", msm_uport->rx.flush);
+ }
+ 
+-static int msm_serial_loopback_enable_set(void *data, u64 val)
++static ssize_t filter_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
+ {
+-	struct msm_hs_port *msm_uport = data;
+-	struct uart_port *uport = &(msm_uport->uport);
++	struct platform_device *pdev = container_of(dev, struct
++						    platform_device, dev);
++	struct msm_hs_port *msm_uport = get_matching_hs_port(pdev);
++	struct uart_port *uport = NULL;
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
+-	msm_hs_resource_vote(msm_uport);
+-
+-	if (val) {
+-		spin_lock_irqsave(&uport->lock, flags);
+-		ret = msm_hs_read(uport, UART_DM_MR2);
+-		ret |= (UARTDM_MR2_LOOP_MODE_BMSK |
+-			UARTDM_MR2_RFR_CTS_LOOP_MODE_BMSK);
+-		msm_hs_write(uport, UART_DM_MR2, ret);
+-		spin_unlock_irqrestore(&uport->lock, flags);
+-	} else {
+-		spin_lock_irqsave(&uport->lock, flags);
+-		ret = msm_hs_read(uport, UART_DM_MR2);
+-		ret &= ~(UARTDM_MR2_LOOP_MODE_BMSK |
+-			UARTDM_MR2_RFR_CTS_LOOP_MODE_BMSK);
+-		msm_hs_write(uport, UART_DM_MR2, ret);
+-		spin_unlock_irqrestore(&uport->lock, flags);
+-	}
+-	/* Calling CLOCK API. Hence mb() requires here. */
+-	mb();
+-
+-	msm_hs_resource_unvote(msm_uport);
+-	return 0;
+-}
++	/* This check should not fail */
++	if (!msm_uport)
++		return -EIO;
+ 
+-static int msm_serial_loopback_enable_get(void *data, u64 *val)
+-{
+-	struct msm_hs_port *msm_uport = data;
+-	struct uart_port *uport = &(msm_uport->uport);
+-	unsigned long flags;
+-	int ret = 0;
++	uport = &(msm_uport->uport);
+ 
+ 	msm_hs_resource_vote(msm_uport);
+ 
+@@ -760,21 +734,29 @@ static int msm_serial_loopback_enable_ge
+ 
+ 	msm_hs_resource_unvote(msm_uport);
+ 
+-	*val = (ret & UARTDM_MR2_LOOP_MODE_BMSK) ? 1 : 0;
+-
+-	return 0;
++	return sprintf(buf, "%u\n", !!(ret & UARTDM_MR2_RX_ERROR_CHAR_OFF));
+ }
+ 
+-static int msm_serial_filter_enable_set(void *data, u64 val)
++static ssize_t filter_store(struct device *dev,
++			struct device_attribute *attr,
++			const char *buf, size_t count)
+ {
+-	struct msm_hs_port *msm_uport = data;
+-	struct uart_port *uport = &(msm_uport->uport);
++	struct platform_device *pdev = container_of(dev, struct
++						    platform_device, dev);
++	struct msm_hs_port *msm_uport = get_matching_hs_port(pdev);
++	struct uart_port *uport = NULL;
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
++	/* This check should not fail */
++	if (!msm_uport)
++		return -EIO;
++
++	uport = &(msm_uport->uport);
++
+ 	msm_hs_resource_vote(msm_uport);
+ 
+-	if (val) {
++	if (buf && buf[0] != '0') {
+ 		spin_lock_irqsave(&uport->lock, flags);
+ 		ret = msm_hs_read(uport, UART_DM_MR2);
+ 		/*
+@@ -798,16 +780,34 @@ static int msm_serial_filter_enable_set(
+ 	mb();
+ 
+ 	msm_hs_resource_unvote(msm_uport);
+-	return 0;
++	return count;
+ }
+ 
+-static int msm_serial_filter_enable_get(void *data, u64 *val)
++/*
++ * msm_serial_hs filter node
++ * writing 1 sets to any rx_break and character having parity of framing
++ * error don't enter inside UART RX FIFO
++ * writing 0 disables the filtering of invalid characters.
++ * Default is enabled.
++ */
++static DEVICE_ATTR(filter, 0664, filter_show, filter_store);
++
++static ssize_t loopback_show(struct device *dev,
++		struct device_attribute *attr, char *buf)
+ {
+-	struct msm_hs_port *msm_uport = data;
+-	struct uart_port *uport = &(msm_uport->uport);
++	struct platform_device *pdev = container_of(dev, struct
++						    platform_device, dev);
++	struct msm_hs_port *msm_uport = get_matching_hs_port(pdev);
++	struct uart_port *uport = NULL;
+ 	unsigned long flags;
+ 	int ret = 0;
+ 
++	/* This check should not fail */
++	if (!msm_uport)
++		return -EIO;
++
++	uport = &(msm_uport->uport);
++
+ 	msm_hs_resource_vote(msm_uport);
+ 
+ 	spin_lock_irqsave(&uport->lock, flags);
+@@ -816,55 +816,57 @@ static int msm_serial_filter_enable_get(
+ 
+ 	msm_hs_resource_unvote(msm_uport);
+ 
+-	*val = (ret & UARTDM_MR2_RX_ERROR_CHAR_OFF) ? 1 : 0;
+-
+-	return 0;
++	return sprintf(buf, "%u\n", !!(ret & UARTDM_MR2_LOOP_MODE_BMSK));
+ }
+-DEFINE_SIMPLE_ATTRIBUTE(loopback_enable_fops, msm_serial_loopback_enable_get,
+-			msm_serial_loopback_enable_set, "%llu\n");
+ 
+-DEFINE_SIMPLE_ATTRIBUTE(filter_enable_fops, msm_serial_filter_enable_get,
+-			msm_serial_filter_enable_set, "%llu\n");			
++static ssize_t loopback_store(struct device *dev,
++			struct device_attribute *attr,
++			const char *buf, size_t count)
++{
++	struct platform_device *pdev = container_of(dev, struct
++						    platform_device, dev);
++	struct msm_hs_port *msm_uport = get_matching_hs_port(pdev);
++	struct uart_port *uport = NULL;
++	unsigned long flags;
++	int ret = 0;
++
++	/* This check should not fail */
++	if (!msm_uport)
++		return -EIO;
++
++	uport = &(msm_uport->uport);
++
++	msm_hs_resource_vote(msm_uport);
++
++	if (buf && buf[0] != '0') {
++		spin_lock_irqsave(&uport->lock, flags);
++		ret = msm_hs_read(uport, UART_DM_MR2);
++		ret |= (UARTDM_MR2_LOOP_MODE_BMSK |
++			UARTDM_MR2_RFR_CTS_LOOP_MODE_BMSK);
++		msm_hs_write(uport, UART_DM_MR2, ret);
++		spin_unlock_irqrestore(&uport->lock, flags);
++	} else {
++		spin_lock_irqsave(&uport->lock, flags);
++		ret = msm_hs_read(uport, UART_DM_MR2);
++		ret &= ~(UARTDM_MR2_LOOP_MODE_BMSK |
++			UARTDM_MR2_RFR_CTS_LOOP_MODE_BMSK);
++		msm_hs_write(uport, UART_DM_MR2, ret);
++		spin_unlock_irqrestore(&uport->lock, flags);
++	}
++	/* Calling CLOCK API. Hence mb() requires here. */
++	mb();
++
++	msm_hs_resource_unvote(msm_uport);
++	return count;
++}
+ 
+ /*
+- * msm_serial_hs debugfs node: <debugfs_root>/msm_serial_hs/loopback.<id>
++ * msm_serial_hs loopback node
+  * writing 1 turns on internal loopback mode in HW. Useful for automation
+  * test scripts.
+  * writing 0 disables the internal loopback mode. Default is disabled.
+- *
+- * msm_serial_hs debugfs node: <debugfs_root>/msm_serial_hs/filter.<id>
+- * writing 1 sets to any rx_break and character having parity of framing
+- * error don't enter inside UART RX FIFO
+- * writing 0 disables the filtering of invalid characters.
+- * Default is enabled.
+  */
+-static void msm_serial_debugfs_init(struct msm_hs_port *msm_uport,
+-					   int id)
+-{
+-	char node_name[15];
+-
+-	snprintf(node_name, sizeof(node_name), "loopback.%d", id);
+-	msm_uport->loopback_dir = debugfs_create_file(node_name,
+-						0644,
+-						debug_base,
+-						msm_uport,
+-						&loopback_enable_fops);
+-
+-	if (IS_ERR_OR_NULL(msm_uport->loopback_dir))
+-		MSM_HS_ERR("%s(): Cannot create loopback.%d debug entry\n",
+-							__func__, id);
+-
+-	snprintf(node_name, sizeof(node_name), "filter.%d", id);
+-	msm_uport->filter_dir = debugfs_create_file(node_name,
+-						0644,
+-						debug_base,
+-						msm_uport,
+-						&filter_enable_fops);
+-
+-	if (IS_ERR_OR_NULL(msm_uport->filter_dir))
+-		MSM_HS_ERR("%s(): Cannot create filter.%d debug entry\n",
+-							__func__, id);							
+-}
++static DEVICE_ATTR(loopback, 0664, loopback_show, loopback_store);
+ 
+ static int msm_hs_remove(struct platform_device *pdev)
+ {
+@@ -892,8 +894,8 @@ static int msm_hs_remove(struct platform
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_clock.attr);
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_debug_mask.attr);
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_hangup.attr);
+-	debugfs_remove(msm_uport->loopback_dir);
+-	debugfs_remove(msm_uport->filter_dir);
++	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_loopback.attr);
++	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_filter.attr);
+ 
+ 	dma_free_coherent(msm_uport->uport.dev,
+ 			UART_DMA_DESC_NR * UARTDM_RX_BUF_SIZE,
+@@ -3785,6 +3787,10 @@ static int msm_hs_probe(struct platform_
+ 		if (unlikely(ret))
+ 			MSM_HS_WARN("%s(): Failed create dev. attr\n",
+ 			 __func__);
++
++		if (sysfs_file_change_owner(&pdev->dev.kobj, dev_attr_debug_mask.attr.name, GLOBAL_ROOT_UID, GLOBAL_SERIAL_GID)) {
++			MSM_HS_ERR("Failed to set ownership for %s\n", dev_attr_debug_mask.attr.name);
++		}
+ 	}
+ 
+ 	uport->irq = core_irqres;
+@@ -3930,18 +3936,31 @@ static int msm_hs_probe(struct platform_
+ 	mb();
+ 
+ 	ret = sysfs_create_file(&pdev->dev.kobj, &dev_attr_clock.attr);
++	ret |= sysfs_create_file(&pdev->dev.kobj, &dev_attr_hangup.attr);
++	ret |= sysfs_create_file(&pdev->dev.kobj, &dev_attr_loopback.attr);
++	ret |= sysfs_create_file(&pdev->dev.kobj, &dev_attr_filter.attr);
++
+ 	if (unlikely(ret)) {
+ 		MSM_HS_ERR("Probe Failed as sysfs failed\n");
+ 		goto err_clock;
+ 	}
+ 
+-	ret = sysfs_create_file(&pdev->dev.kobj, &dev_attr_hangup.attr);
+-	if (unlikely(ret)) {
+-		MSM_HS_ERR("Probe Failed as sysfs failed\n");
+-		goto err_clock;
++	if (sysfs_file_change_owner(&pdev->dev.kobj, dev_attr_clock.attr.name, GLOBAL_ROOT_UID, GLOBAL_SERIAL_GID)) {
++		MSM_HS_ERR("Failed to set ownership for %s\n", dev_attr_clock.attr.name);
++	}
++
++	if (sysfs_file_change_owner(&pdev->dev.kobj, dev_attr_hangup.attr.name, GLOBAL_ROOT_UID, GLOBAL_SERIAL_GID)) {
++		MSM_HS_ERR("Failed to set ownership for %s\n", dev_attr_hangup.attr.name);
++	}
++
++	if (sysfs_file_change_owner(&pdev->dev.kobj, dev_attr_loopback.attr.name, GLOBAL_ROOT_UID, GLOBAL_SERIAL_GID)) {
++		MSM_HS_ERR("Failed to set ownership for %s\n", dev_attr_loopback.attr.name);
++	}
++
++	if (sysfs_file_change_owner(&pdev->dev.kobj, dev_attr_filter.attr.name, GLOBAL_ROOT_UID, GLOBAL_SERIAL_GID)) {
++		MSM_HS_ERR("Failed to set ownership for %s\n", dev_attr_filter.attr.name);
+ 	}
+ 
+-	msm_serial_debugfs_init(msm_uport, pdev->id);
+ 	msm_hs_unconfig_uart_gpios(uport);
+ 
+ 	uport->line = pdev->id;
+@@ -3990,14 +4009,10 @@ static int __init msm_serial_hs_init(voi
+ 		pr_err("%s failed to load\n", __func__);
+ 		return ret;
+ 	}
+-	debug_base = debugfs_create_dir("msm_serial_hs", NULL);
+-	if (IS_ERR_OR_NULL(debug_base))
+-		pr_err("msm_serial_hs: Cannot create debugfs dir\n");
+ 
+ 	ret = platform_driver_register(&msm_serial_hs_platform_driver);
+ 	if (ret) {
+ 		pr_err("%s failed to load\n", __func__);
+-		debugfs_remove_recursive(debug_base);
+ 		uart_unregister_driver(&msm_hs_driver);
+ 		return ret;
+ 	}
+@@ -4125,7 +4140,6 @@ static void msm_hs_shutdown(struct uart_
+ static void __exit msm_serial_hs_exit(void)
+ {
+ 	pr_debug("msm_serial_hs module removed\n");
+-	debugfs_remove_recursive(debug_base);
+ 	platform_driver_unregister(&msm_serial_hs_platform_driver);
+ 	uart_unregister_driver(&msm_hs_driver);
+ }

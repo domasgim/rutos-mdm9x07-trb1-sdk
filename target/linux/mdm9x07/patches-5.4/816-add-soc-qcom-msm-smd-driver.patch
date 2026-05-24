@@ -1,0 +1,36 @@
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -202,6 +202,26 @@ config MSM_SMEM
+          processors in the System on a Chip (SoC) which allows basic
+          inter-processor communication.
+ 
++config MSM_SMD
++       depends on MSM_SMEM
++       bool "MSM Shared Memory Driver (SMD)"
++       help
++         Support for the shared memory interprocessor communication protocol
++         which provides virual point to point serial channels between processes
++         on the apps processor and processes on other processors in the SoC.
++         Also includes support for the Shared Memory State Machine (SMSM)
++         protocol which provides a mechanism to publish single bit state
++         information to one or more processors in the SoC.
++
++config MSM_SMD_DEBUG
++       depends on MSM_SMD
++       bool "MSM SMD debug support"
++       help
++         Support for debugging SMD and SMSM communication between apps and
++         other processors in the SoC. Debug support primarily consists of
++         logs consisting of information such as what interrupts were processed,
++         what channels caused interrupt activity, and when internal state
++         change events occur.
+ 
+ config QCOM_RPM_SMD_LEGACY
+ 	bool "Qualcomm RPM driver using SMD protocol"
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -26,3 +26,4 @@ obj-$(CONFIG_QCOM_RPMHPD) += rpmhpd.o
+ obj-$(CONFIG_QCOM_RPMPD) += rpmpd.o
+ obj-$(CONFIG_QCOM_RPM_SMD_LEGACY) += rpm-smd.o
+ obj-$(CONFIG_MSM_SMEM)  +=smem.o smem_state.o
++obj-$(CONFIG_MSM_SMD)   += smd.o smd_private.o smd_init_dt.o smsm_debug.o

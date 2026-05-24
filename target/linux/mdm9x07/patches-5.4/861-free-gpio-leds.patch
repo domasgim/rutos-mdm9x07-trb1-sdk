@@ -1,0 +1,21 @@
+--- a/drivers/leds/leds-gpio.c
++++ b/drivers/leds/leds-gpio.c
+@@ -17,6 +17,8 @@
+ #include <linux/property.h>
+ #include <linux/slab.h>
+ 
++#include "../gpio/gpiolib.h"
++
+ struct gpio_led_data {
+ 	struct led_classdev cdev;
+ 	struct gpio_desc *gpiod;
+@@ -297,6 +299,9 @@ static int gpio_led_probe(struct platfor
+ 
+ 	platform_set_drvdata(pdev, priv);
+ 
++	for (i = 0; i < priv->num_leds; i++)
++		gpiod_free(priv->leds[i].gpiod);
++
+ 	return 0;
+ }
+ 

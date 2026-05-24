@@ -1,0 +1,131 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -66,6 +66,9 @@
+ #include <linux/platform_data/msm_serial_hs.h>
+ #include <linux/msm-bus.h>
+ 
++#include <soc/qcom/subsystem_notif.h>
++#include <soc/qcom/subsystem_restart.h>
++
+ #include "msm_serial_hs_hwreg.h"
+ #define UART_SPS_CONS_PERIPHERAL 0
+ #define UART_SPS_PROD_PERIPHERAL 1
+@@ -265,6 +268,8 @@ struct msm_hs_port {
+ 	int ipc_debug_mask;
+ 	struct hrtimer	stop_rts_timer; /* "rs485 stop rts" timer 	*/
+ 	unsigned long	bit_time;	/* for holding bit time */
++	void *subsys_handle; /* For (un)registering modem restart notifier */
++	struct notifier_block modem_restart_notifier;
+ 
+ #ifdef QUECTEL_UART_SUSPEND
+ 	atomic_t wlock_count;
+@@ -571,6 +576,44 @@ static ssize_t set_debug_mask(struct dev
+ static DEVICE_ATTR(debug_mask, 0644, show_debug_mask,
+ 							set_debug_mask);
+ 
++static void try_hangup_port(struct msm_hs_port *msm_uport)
++{
++	/* This should fail if no tty for main UART is opened */
++	if (msm_uport && msm_uport->uport.state && msm_uport->uport.state->port.tty) {
++		pr_info("Hanging up %s\n", msm_uport->uport.state->port.tty->name);
++		tty_hangup(msm_uport->uport.state->port.tty);
++	}
++}
++
++static ssize_t hangup_store(struct device *dev, struct device_attribute *attr,
++			 const char *buf, size_t count)
++{
++	struct platform_device *pdev = container_of(dev, struct platform_device, dev);
++	struct msm_hs_port *msm_uport = get_matching_hs_port(pdev);
++
++	try_hangup_port(msm_uport);
++
++	return count;
++}
++
++static DEVICE_ATTR_WO(hangup);
++
++static int modem_restart_notifier_cb(struct notifier_block *this,
++				unsigned long code,
++				void *data)
++{
++	struct msm_hs_port *msm_uport;
++
++	if (code != SUBSYS_AFTER_POWERUP)
++		return NOTIFY_DONE;
++
++	msm_uport = container_of(this, struct msm_hs_port, modem_restart_notifier);
++
++	try_hangup_port(msm_uport);
++
++	return NOTIFY_DONE;
++}
++
+ static inline bool is_use_low_power_wakeup(struct msm_hs_port *msm_uport)
+ {
+ 	return msm_uport->wakeup.irq > 0;
+@@ -828,6 +871,7 @@ static int msm_hs_remove(struct platform
+ 
+ 	struct msm_hs_port *msm_uport;
+ 	struct device *dev;
++	int ret;
+ 
+ 	if (pdev->id < 0 || pdev->id >= UARTDM_NR) {
+ 		pr_err("Invalid plaform device ID = %d\n", pdev->id);
+@@ -838,9 +882,16 @@ static int msm_hs_remove(struct platform
+ 	if (!msm_uport)
+ 		return -EINVAL;
+ 
++	if (!msm_uport->modem_restart_notifier.notifier_call) {
++		ret = subsys_notif_unregister_notifier(msm_uport->subsys_handle, &msm_uport->modem_restart_notifier);
++		if (ret)
++			pr_err("Failed to unregister notifier for \"modem\"\n");
++	}
++
+ 	dev = msm_uport->uport.dev;
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_clock.attr);
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_debug_mask.attr);
++	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_hangup.attr);
+ 	debugfs_remove(msm_uport->loopback_dir);
+ 	debugfs_remove(msm_uport->filter_dir);
+ 
+@@ -2906,6 +2957,16 @@ static int msm_hs_startup(struct uart_po
+ 		goto sps_disconnect_rx;
+ 	}
+ 
++	/* It is too early to register notifier during probing. Soo... we do it once during first port startup */
++	if (!msm_uport->modem_restart_notifier.notifier_call) {
++		msm_uport->modem_restart_notifier.notifier_call = modem_restart_notifier_cb;
++		msm_uport->subsys_handle = subsys_notif_register_notifier("modem", &msm_uport->modem_restart_notifier);
++		if (IS_ERR(msm_uport->subsys_handle)) {
++			ret = (int)PTR_ERR(msm_uport->subsys_handle);
++			pr_err("Failed to register for modem reset notifier: %d\n", ret);
++			goto sps_disconnect_rx;
++		}
++	}
+ 
+ 	spin_lock_irqsave(&uport->lock, flags);
+ 	atomic_set(&msm_uport->client_count, 0);
+@@ -2918,8 +2979,8 @@ static int msm_hs_startup(struct uart_po
+ #ifdef QUECTEL_UART_SUSPEND
+ 	atomic_set(&msm_uport->startup_count, 1);
+ #endif
+-
+ 	msm_hs_resource_unvote(msm_uport);
++
+ 	return 0;
+ 
+ sps_disconnect_rx:
+@@ -3872,6 +3933,12 @@ static int msm_hs_probe(struct platform_
+ 	if (unlikely(ret)) {
+ 		MSM_HS_ERR("Probe Failed as sysfs failed\n");
+ 		goto err_clock;
++	}
++
++	ret = sysfs_create_file(&pdev->dev.kobj, &dev_attr_hangup.attr);
++	if (unlikely(ret)) {
++		MSM_HS_ERR("Probe Failed as sysfs failed\n");
++		goto err_clock;
+ 	}
+ 
+ 	msm_serial_debugfs_init(msm_uport, pdev->id);

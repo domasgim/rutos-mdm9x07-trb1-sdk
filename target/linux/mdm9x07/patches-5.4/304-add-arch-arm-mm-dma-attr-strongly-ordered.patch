@@ -1,0 +1,28 @@
+--- a/arch/arm/mm/dma-mapping.c
++++ b/arch/arm/mm/dma-mapping.c
+@@ -600,6 +600,9 @@ static void __free_from_contiguous(struc
+ 
+ static inline pgprot_t __get_dma_pgprot(unsigned long attrs, pgprot_t prot)
+ {
++        if (attrs & DMA_ATTR_STRONGLY_ORDERED)
++                return pgprot_stronglyordered(prot);
++
+ 	prot = (attrs & DMA_ATTR_WRITE_COMBINE) ?
+ 			pgprot_writecombine(prot) :
+ 			pgprot_dmacoherent(prot);
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -71,6 +71,13 @@
+ #define DMA_ATTR_PRIVILEGED		(1UL << 9)
+ 
+ /*
++ * DMA_ATTR_STRONGLY_ORDERED: Specifies that accesses to the mapping must
++ * not be buffered, reordered, merged with other accesses, or unaligned.
++ * No speculative access may occur in this mapping.
++ */
++#define DMA_ATTR_STRONGLY_ORDERED       (1UL << 11)
++
++/*
+  * A dma_addr_t can hold any valid DMA or bus address for the platform.
+  * It can be given to a device to use as a DMA source or target.  A CPU cannot
+  * reference a dma_addr_t directly because there may be translation between

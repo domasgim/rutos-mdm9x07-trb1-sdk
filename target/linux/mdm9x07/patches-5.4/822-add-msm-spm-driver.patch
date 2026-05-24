@@ -1,0 +1,23 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -27,3 +27,4 @@ obj-$(CONFIG_QCOM_RPMPD) += rpmpd.o
+ obj-$(CONFIG_QCOM_RPM_SMD_LEGACY) += rpm-smd.o
+ obj-$(CONFIG_MSM_SMEM)  +=smem.o smem_state.o
+ obj-$(CONFIG_MSM_SMD)   += smd.o smd_private.o smd_init_dt.o smsm_debug.o
++obj-$(CONFIG_MSM_SPM) += msm-spm.o spm_devices.o
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -231,4 +231,13 @@ config QCOM_RPM_SMD_LEGACY
+ 	  transport layer communication with RPM hardware. It also selects
+ 	  the MSM_MPM config that programs the MPM module to monitor interrupts
+ 	  during sleep modes.
++
++config MSM_SPM
++	bool "Driver support for SPM Version 2"
++	help
++	  Enables the support for Version 2 of the SPM driver. SPM hardware is
++	  used to manage the processor power during sleep. The driver allows  
++	  configuring SPM to allow different low power modes for both core and  
++	  L2.
++
+ endmenu

@@ -1,0 +1,20 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -2757,7 +2757,16 @@ static int msm_hs_startup(struct uart_po
+ 	MSM_HS_DBG("%s():desc usage flag 0x%lx\n", __func__, rx->queued_flag);
+ 
+ 	tx->parent = msm_uport;
+-	timer_setup(&(tx->tx_timeout_timer), tx_timeout_handler, 0);
++
++	if (!timer_pending(&tx->tx_timeout_timer)) {
++		if (tx->tx_timeout_timer.entry.next == LIST_POISON1 ||
++				tx->tx_timeout_timer.entry.next == LIST_POISON2)
++			memset(&tx->tx_timeout_timer, 0, sizeof(tx->tx_timeout_timer));
++
++		timer_setup(&(tx->tx_timeout_timer), tx_timeout_handler, 0);
++	} else {
++		MSM_HS_DBG("%s(): tx timer is already initialized and pending\n", __func__);
++	}
+ 
+ 	/* Enable reading the current CTS, no harm even if CTS is ignored */
+ 	msm_uport->imr_reg |= UARTDM_ISR_CURRENT_CTS_BMSK;

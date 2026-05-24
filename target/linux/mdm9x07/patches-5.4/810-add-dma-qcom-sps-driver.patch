@@ -1,0 +1,29 @@
+--- a/drivers/dma/Makefile
++++ b/drivers/dma/Makefile
+@@ -75,6 +75,7 @@ obj-$(CONFIG_UNIPHIER_MDMAC) += uniphier
+ obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
+ obj-$(CONFIG_ZX_DMA) += zx_dma.o
+ obj-$(CONFIG_ST_FDMA) += st_fdma.o
++obj-$(CONFIG_QCOM_SPS_DMA) += qcom-sps-dma.o
+ 
+ obj-y += mediatek/
+ obj-y += qcom/
+--- a/drivers/dma/Kconfig
++++ b/drivers/dma/Kconfig
+@@ -480,6 +480,16 @@ config PXA_DMA
+ 	  16 to 32 channels for peripheral to memory or memory to memory
+ 	  transfers.
+ 
++config QCOM_SPS_DMA
++        tristate "Qualcomm technologies inc DMA driver for sps-BAM"
++        depends on ARCH_QCOM
++        select DMA_ENGINE
++        help
++          Enable support for Qualcomm technologies inc, BAM DMA engine.
++          This DMA-engine-driver is a wrapper of the sps-BAM library. DMA
++          engine callbacks are implemented using the sps-BAM functionality
++          to access HW.
++
+ config SIRF_DMA
+ 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
+ 	depends on ARCH_SIRF

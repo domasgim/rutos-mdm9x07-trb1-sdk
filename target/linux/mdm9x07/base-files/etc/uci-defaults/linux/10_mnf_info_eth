@@ -1,0 +1,33 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+ETH_DEV=$(/sbin/mnf_info -n | grep -i 'TRB140\|TRB143' )
+
+# set only for TRB140X and TRB143X targets
+[ -z "$ETH_DEV" ] && {
+	exit 0
+}
+
+# load all ethernet drivers
+modprobe at803x
+modprobe motorcomm
+modprobe en8801s
+modprobe qcom_emac
+
+phy_id=$(cat /sys/devices/platform/7c40000.qcom,emac/mdio_bus/7c40000.*/7c40000.*/phy_id | cut -c 3-9)
+
+if [ "$phy_id" = "03a2946" ]; then # EN8801S id 03a29461
+	# Airoha chip detected
+	rmmod at803x
+	rmmod motorcomm
+elif [ "$phy_id" = "4f51e91" ]; then # YT8531S id 4f51e91a
+	# Motorcomm chip detected
+	rmmod at803x
+	rmmod en8801s
+else
+	rmmod motorcomm
+	rmmod en8801s
+fi
+
+exit 1

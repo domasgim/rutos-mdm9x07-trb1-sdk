@@ -1,0 +1,33 @@
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+=
+ obj-$(CONFIG_ARM_RK3399_DMC_DEVFREQ)	+= rk3399_dmc.o
+ obj-$(CONFIG_ARM_TEGRA_DEVFREQ)		+= tegra30-devfreq.o
+ obj-$(CONFIG_ARM_TEGRA20_DEVFREQ)	+= tegra20-devfreq.o
++obj-$(CONFIG_QCOM_DEVFREQ_DEVBW)	+= devfreq_devbw.o
+ 
+ # DEVFREQ Event Drivers
+ obj-$(CONFIG_PM_DEVFREQ_EVENT)		+= event/
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -129,6 +129,20 @@ config ARM_RK3399_DMC_DEVFREQ
+           It sets the frequency for the memory controller and reads the usage counts
+           from hardware.
+ 
++config QCOM_DEVFREQ_DEVBW
++        bool "Qualcomm Technologies Inc. DEVFREQ device for device master <-> slave IB/AB BW voting"
++        depends on ARCH_QCOM
++        select DEVFREQ_GOV_PERFORMANCE
++        select DEVFREQ_GOV_POWERSAVE
++        select DEVFREQ_GOV_USERSPACE
++        select DEVFREQ_GOV_CPUFREQ
++        default n
++        help
++          Different devfreq governors use this devfreq device to make CPU to
++          DDR IB/AB bandwidth votes. This driver provides a SoC topology
++          agnostic interface to so that some of the devfreq governors can be
++          shared across SoCs.
++
+ source "drivers/devfreq/event/Kconfig"
+ 
+ endif # PM_DEVFREQ

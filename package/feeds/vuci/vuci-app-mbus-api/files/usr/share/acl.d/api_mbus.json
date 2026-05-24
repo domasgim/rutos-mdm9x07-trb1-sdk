@@ -1,0 +1,1 @@
+{"user":"uhttpd","access":{"mbus_client*":{"methods":["status","read_manufacturer_info","test","test_group","scan_start_primary","scan_start_secondary","scan_stop","scan_status","ping_device","reset_device","change_address","change_device_baudrate","get_tags"]}}}

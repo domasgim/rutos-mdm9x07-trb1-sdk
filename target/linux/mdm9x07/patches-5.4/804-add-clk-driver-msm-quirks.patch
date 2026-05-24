@@ -1,0 +1,162 @@
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -2,7 +2,7 @@
+ # common clock types
+ obj-$(CONFIG_HAVE_CLK)		+= clk-devres.o clk-bulk.o
+ obj-$(CONFIG_CLKDEV_LOOKUP)	+= clkdev.o
+-obj-$(CONFIG_COMMON_CLK)	+= clk.o
++obj-$(CONFIG_OF)		+= clk.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-divider.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-factor.o
+ obj-$(CONFIG_COMMON_CLK)	+= clk-fixed-rate.o
+--- a/drivers/clk/clk.h
++++ b/drivers/clk/clk.h
+@@ -8,7 +8,7 @@ struct clk_hw;
+ struct device;
+ struct of_phandle_args;
+ 
+-#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++#if defined(CONFIG_OF)
+ struct clk_hw *of_clk_get_hw(struct device_node *np,
+ 				    int index, const char *con_id);
+ #else /* !CONFIG_COMMON_CLK || !CONFIG_OF */
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -24,6 +24,7 @@
+ 
+ #include "clk.h"
+ 
++#if defined(CONFIG_COMMON_CLK)
+ static DEFINE_SPINLOCK(enable_lock);
+ static DEFINE_MUTEX(prepare_lock);
+ 
+@@ -4368,14 +4369,15 @@ int clk_notifier_unregister(struct clk *
+ }
+ EXPORT_SYMBOL_GPL(clk_notifier_unregister);
+ 
+-#ifdef CONFIG_OF
+ static void clk_core_reparent_orphans(void)
+ {
+ 	clk_prepare_lock();
+ 	clk_core_reparent_orphans_nolock();
+ 	clk_prepare_unlock();
+ }
++#endif /* CONFIG_COMMON_CLK */
+ 
++#ifdef CONFIG_OF
+ /**
+  * struct of_clk_provider - Clock provider registration structure
+  * @link: Entry in global list of clock providers
+@@ -4413,6 +4415,7 @@ struct clk_hw *of_clk_hw_simple_get(stru
+ }
+ EXPORT_SYMBOL_GPL(of_clk_hw_simple_get);
+ 
++#if defined(CONFIG_COMMON_CLK)
+ struct clk *of_clk_src_onecell_get(struct of_phandle_args *clkspec, void *data)
+ {
+ 	struct clk_onecell_data *clk_data = data;
+@@ -4426,6 +4429,7 @@ struct clk *of_clk_src_onecell_get(struc
+ 	return clk_data->clks[idx];
+ }
+ EXPORT_SYMBOL_GPL(of_clk_src_onecell_get);
++#endif /* CONFIG_COMMON_CLK */
+ 
+ struct clk_hw *
+ of_clk_hw_onecell_get(struct of_phandle_args *clkspec, void *data)
+@@ -4471,7 +4475,9 @@ int of_clk_add_provider(struct device_no
+ 	mutex_unlock(&of_clk_mutex);
+ 	pr_debug("Added clock from %pOF\n", np);
+ 
++#if defined(CONFIG_COMMON_CLK)
+ 	clk_core_reparent_orphans();
++#endif /* CONFIG_COMMON_CLK */
+ 
+ 	ret = of_clk_set_defaults(np, true);
+ 	if (ret < 0)
+@@ -4508,7 +4514,9 @@ int of_clk_add_hw_provider(struct device
+ 	mutex_unlock(&of_clk_mutex);
+ 	pr_debug("Added clk_hw provider from %pOF\n", np);
+ 
++#if defined(CONFIG_COMMON_CLK)
+ 	clk_core_reparent_orphans();
++#endif /* CONFIG_COMMON_CLK */
+ 
+ 	ret = of_clk_set_defaults(np, true);
+ 	if (ret < 0)
+@@ -4744,6 +4752,7 @@ of_clk_get_hw_from_clkspec(struct of_pha
+ 	return hw;
+ }
+ 
++#ifdef CONFIG_COMMON_CLK
+ /**
+  * of_clk_get_from_provider() - Lookup a clock from a clock provider
+  * @clkspec: pointer to a clock specifier data structure
+@@ -4759,6 +4768,7 @@ struct clk *of_clk_get_from_provider(str
+ 	return clk_hw_create_clk(NULL, hw, NULL, __func__);
+ }
+ EXPORT_SYMBOL_GPL(of_clk_get_from_provider);
++#endif /* CONFIG_COMMON_CLK */
+ 
+ struct clk_hw *of_clk_get_hw(struct device_node *np, int index,
+ 			     const char *con_id)
+@@ -4777,6 +4787,7 @@ struct clk_hw *of_clk_get_hw(struct devi
+ 	return hw;
+ }
+ 
++#ifdef CONFIG_OF
+ static struct clk *__of_clk_get(struct device_node *np,
+ 				int index, const char *dev_id,
+ 				const char *con_id)
+@@ -4809,7 +4820,9 @@ struct clk *of_clk_get_by_name(struct de
+ 	return __of_clk_get(np, 0, np->full_name, name);
+ }
+ EXPORT_SYMBOL(of_clk_get_by_name);
++#endif /* CONFIG_OF */
+ 
++#ifdef CONFIG_COMMON_CLK
+ /**
+  * of_clk_get_parent_count() - Count the number of clocks a device node has
+  * @np: device node to count
+@@ -4887,6 +4900,7 @@ const char *of_clk_get_parent_name(struc
+ 	return clk_name;
+ }
+ EXPORT_SYMBOL_GPL(of_clk_get_parent_name);
++#endif /* CONFIG_COMMON_CLK */
+ 
+ /**
+  * of_clk_parent_fill() - Fill @parents with names of @np's parents and return
+@@ -4909,6 +4923,7 @@ int of_clk_parent_fill(struct device_nod
+ }
+ EXPORT_SYMBOL_GPL(of_clk_parent_fill);
+ 
++#if defined(CONFIG_COMMON_CLK)
+ struct clock_provider {
+ 	void (*clk_init_cb)(struct device_node *);
+ 	struct device_node *np;
+@@ -5059,4 +5074,5 @@ void __init of_clk_init(const struct of_
+ 			force = true;
+ 	}
+ }
++#endif /* CONFIG_COMMON_CLK */
+ #endif
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -321,7 +321,6 @@ config ARCH_MULTIPLATFORM
+ 	select ARM_PATCH_PHYS_VIRT
+ 	select AUTO_ZRELADDR
+ 	select TIMER_OF
+-	select COMMON_CLK
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_IRQ_MULTI_HANDLER
+ 	select HAVE_PCI
+--- a/include/linux/clk.h
++++ b/include/linux/clk.h
+@@ -1071,7 +1071,7 @@ static inline struct clk *clk_get_option
+ 	return clk;
+ }
+ 
+-#if defined(CONFIG_OF) && defined(CONFIG_COMMON_CLK)
++#if defined(CONFIG_OF)
+ struct clk *of_clk_get(struct device_node *np, int index);
+ struct clk *of_clk_get_by_name(struct device_node *np, const char *name);
+ struct clk *of_clk_get_from_provider(struct of_phandle_args *clkspec);

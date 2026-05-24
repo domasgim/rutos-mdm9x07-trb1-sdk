@@ -1,0 +1,145 @@
+#!/bin/sh
+. /usr/share/libubox/jshn.sh
+
+VALIDATE_FILE=/tmp/.trb14x_mdm_image_verified
+
+while [[ $# -gt 0 ]]
+do
+	key="$1"
+	case $key in
+	--check)
+		check_flg=1
+		shift
+	;;
+	--file)
+		file="$2"
+		shift
+		shift
+	;;
+	esac
+done
+
+[ ! -r "$file" ] && {
+	echo "Usage: modem_upgrade --check --file <filename>"
+	exit 1
+}
+
+read_failsafe_modem_info() {
+	eval "$(jsonfilter -q -i "/etc/board.json" \
+		-e "revision=@['modems'][@.builtin=true].revision" \
+		-e "region=@['modems'][@.builtin=true].region" \
+		)"
+
+	[ -n "$revision" ] && {
+		echo "${revision:0:4}${region}"
+		return
+	}
+}
+
+validate_fw() {
+	echo "Opening $file file..."
+	ctl_dir="/tmp/${1%/}"
+
+	control_dir=$(tar tf $file | grep 'CONTROL') || {
+		echo "Control file is malformed!"
+		exit 8
+	}
+
+	tar xf $file $control_dir -C /tmp || {
+		echo "Unable to untar modem upgrade control file"
+		exit 2
+	}
+
+	target_rev=$(cat ${ctl_dir}/CONTROL | cut -c 9-)
+	[ -z "$target_rev" ] && {
+		echo "Couldn't retrieve target rev from upgrade file!"
+		exit 4
+	}
+	current_rev=$(read_failsafe_modem_info)
+
+	echo "Current modem revision: ${current_rev}"
+	echo "Target modem revision: ${target_rev}"
+	echo ""
+
+	mnf_region=$(mnf_info -n | cut -c 7)
+	current_model=${current_rev:0:4}
+	current_region=${current_rev:4:2}
+	target_model=${target_rev:0:4}
+	[ "$mnf_region" -eq 4 ] && target_region=${target_rev:4:1} || target_region=${target_rev:4:2}
+	echo "Current model: ${current_model}, region: ${current_region}"
+	echo "Target model: ${target_model}, region: ${target_region}"
+	echo ""
+
+	[ ! "$current_model" == "$target_model" ] || \
+	[ ! "$current_region" == "$target_region" ] && {
+		rm -rf $ctl_dir
+		echo "Upgrade file is not compatible!"
+		exit 3
+	}
+
+	echo "Validation successful"
+	touch $VALIDATE_FILE
+}
+
+modem_dir=$(tar tf $file | grep -m 1 '^modem_update-.*/$') || {
+	echo "Upgrade file is malformed!"
+	exit 8
+}
+
+[ -n "$check_flg" ] && {
+	echo "TRB14X Modem FW check procedure"
+	validate_fw $modem_dir
+	exit 0
+}
+
+[ -e "$VALIDATE_FILE" ] || {
+	echo "Modem FW is not validated"
+	exit 7
+}
+
+#get modem ubi image size
+modem_image=$(tar tvf $file "$modem_dir""modem")
+modem_size=$(echo $modem_image | awk '{print $3}')
+modem_image=$(echo $modem_image | awk '{print $6}')
+
+[ -z "$modem_image" ] && {
+	echo "Unable to detect modem image in upgrade file!"
+	exit 8
+}
+
+cleanup() {
+	rm -rf "$modem_dir" "$VALIDATE_FILE"
+}
+trap cleanup EXIT
+
+echo "TRB14X Modem upgrade procedure"
+
+modem_mtd=$(grep "modem" /proc/mtd | cut -f1 -d ":")
+modem_mtd="/dev/$modem_mtd"
+[ ! -e "$modem_mtd" ] && {
+	echo "Unable to detect modem mtd partition!"
+	exit 4
+}
+
+echo "Detected modem partition at ${modem_mtd}"
+echo "Unmounting /firmware partition..."
+
+umount /firmware
+
+echo ""
+echo "Performing modem upgrade..."
+
+ubidetach -p "${modem_mtd}" || {
+	echo "Unable to upgrade modem: failed to detach modem partition!"
+	exit 5
+}
+
+sync
+
+tar -Oxf $file $modem_image | ubiformat "${modem_mtd}" -y -f - -S $modem_size || {
+	echo "Unable to upgrade modem: failed to write new upgrade file!"
+	exit 6
+}
+
+echo "Successfully upgraded modem! Please reboot the device."
+exit 0

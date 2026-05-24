@@ -1,0 +1,17 @@
+{
+	"services/mbus": {
+		"title": "M-Bus",
+		"index": 140,
+		"depends": {
+			"board": {
+				"allOf": ["has_mbus"]
+			}
+		}
+	},
+	"services/mbus/client": {
+		"title": "Client",
+		"index": 10,
+		"view": "services/MBus",
+		"acls": [ "services/mbus/client" ]
+	}
+}

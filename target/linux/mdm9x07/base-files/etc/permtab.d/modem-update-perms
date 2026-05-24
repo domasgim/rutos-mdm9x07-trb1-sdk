@@ -1,0 +1,2 @@
+# setup modem firmware upgrade folder
+/usr/local/modemfw           root:uhttpd         774        cd

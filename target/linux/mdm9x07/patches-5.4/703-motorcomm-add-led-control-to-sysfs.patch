@@ -1,0 +1,166 @@
+--- a/drivers/net/phy/motorcomm.c
++++ b/drivers/net/phy/motorcomm.c
+@@ -24,6 +24,10 @@
+ #include <linux/phy.h>
+ #include <linux/of.h>
+ #include <linux/clk.h>
++#include <linux/leds.h>
++#include <linux/ethtool.h>
++#include <linux/mdio.h>
++
+ #ifndef LINUX_VERSION_CODE
+ #include <linux/version.h>
+ #else
+@@ -115,6 +119,15 @@
+ #define YT8512_SPEED_MODE		0xc000
+ #define YT8512_DUPLEX			0x2000
+ 
++#define YT8512_LED1_CFG			0xA00D
++#define YT8512_LED2_CFG			0xA00E
++
++#define YT8512_LED_OFF			0x0000
++#define YT8512_LED_ON_100		0x0020
++#define YT8512_LED_ON_1000		0x0040
++#define YT8512_LED_STATUS_100		0x0620
++#define YT8512_LED_STATUS_1000		0x0640
++
+ #define YT8512_SPEED_MODE_BIT		14
+ #define YT8512_DUPLEX_BIT		13
+ #define YT8512_EN_SLEEP_SW_BIT		15
+@@ -162,6 +175,21 @@ enum ytphy_wol_feature_pulse_width_e {
+ 	YTPHY_WOL_FEATURE_PULSE_WIDTH_MAX
+ };
+ 
++enum sw_port_led_control
++{
++	YTPHY_PORT_LED_ACT_OFF = 0,
++	YTPHY_PORT_LED_ACT_ON = 1,
++	YTPHY_PORT_LED_ACT_STATUS = 2
++};
++
++struct yt8512_priv {
++    struct phy_device *phydev;
++	struct led_classdev led;
++	struct mdio_device mdio;
++    int register_flag;
++	int set_mode;
++};
++
+ struct ytphy_wol_feature_cfg {
+ 	bool enable;
+ 	int type;
+@@ -177,7 +205,7 @@ struct ytphy_chip_info_s {
+ };
+ 
+ /* MOTORCOMM_PHY_H */
+- 
++
+ #if (YTPHY_WOL_FEATURE_ENABLE)
+ #undef SYS_WAKEUP_BASED_ON_ETH_PKT
+ #define SYS_WAKEUP_BASED_ON_ETH_PKT 	1
+@@ -219,7 +247,7 @@ static struct ytphy_chip_info_s yt8521_c
+ 
+ /* support automatically check polling mode for yt8521
+  * for Fiber only system, please define YT8521_PHY_MODE_CURR 1
+- * for UTP only system, please define YT8521_PHY_MODE_CURR 2
++ * for UTP only system, please define YT8521_PHY_MODE_CURR 2git@git.teltonika.lt:teltonika/rutx_open.git
+  * for combo system, please define YT8521_PHY_MODE_CURR 3
+  */
+ static int yt8521_polling_mode_get(struct phy_device *phydev);
+@@ -955,11 +983,64 @@ static int yt8521_link_mode_set(struct p
+ 	return 1;
+ }
+ 
++static void yt8521_led_set_mode(struct led_classdev *cdev, enum led_brightness mode)
++{
++	struct yt8512_priv *priv = container_of(cdev, struct yt8512_priv, led);
++	int reg = YT8512_LED1_CFG;
++	int mask;
++	int i;
++
++	if (mode < 0)
++		mode = 0;
++	else if (mode > 0)
++		mode = 2;
++
++	switch (mode) {
++		case YTPHY_PORT_LED_ACT_OFF:
++			mask =  YT8512_LED_OFF;
++			break;
++		case YTPHY_PORT_LED_ACT_STATUS:
++			mask =  YT8512_LED_STATUS_100;
++			break;
++		default:
++			return;
++	}
++
++	for (i = 0; i < 2; i++)
++	{
++		reg = reg + i;
++
++		if( mdiobus_write(priv->mdio.bus, priv->mdio.addr, REG_DEBUG_ADDR_OFFSET, reg) < 0)
++			return;
++		mdiobus_write(priv->mdio.bus, priv->mdio.addr, REG_DEBUG_DATA, mask);
++
++		if(mask != YT8512_LED_OFF)
++		{
++			mask = mask + 32; //shift by 0x20 for 100-1000 mode
++		}
++
++	}
++	priv->set_mode = mode;
++}
++
++static enum led_brightness yt8521_led_get_brightness(struct led_classdev *cdev)
++{
++	struct yt8512_priv *priv = container_of(cdev, struct yt8512_priv, led);
++	return priv->set_mode;
++}
++
+ static int yt8521_config_init(struct phy_device *phydev)
+ {
++	struct device *dev = &phydev->mdio.dev;
++	struct yt8512_priv *priv;
++
+ 	int ret;
+ 	int val, hw_strap_mode;
+ 
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
+ #if (YTPHY_WOL_FEATURE_ENABLE)
+ 	struct ethtool_wolinfo wol;
+ 
+@@ -1002,6 +1083,22 @@ static int yt8521_config_init(struct phy
+ 	if (ret < 0)
+ 		return ret;
+ 
++	phydev->priv = priv;
++	priv->mdio = phydev->mdio;
++	priv->phydev = phydev;
++	priv->led.name = "eth_led";
++	priv->led.max_brightness = 2;
++	priv->led.brightness_set = yt8521_led_set_mode;
++	priv->led.brightness_get = yt8521_led_get_brightness;
++
++	ret = devm_led_classdev_register(dev, &priv->led);
++	if (ret) {
++	 	dev_err(dev, "LED registration failed!\n");
++	 	return ret;
++	}
++	else {
++		priv->register_flag = 1;
++	}
+ 	netdev_info(phydev->attached_dev, "yt8521 config init done, strap mode=%d, polling mode=%d.\n", hw_strap_mode, yt8521_polling_mode_get(phydev));
+ 	return ret;
+ }
+@@ -1157,6 +1254,8 @@ static int yt8521_read_status(struct phy
+ 
+ int yt8521_suspend(struct phy_device *phydev)
+ {
++	struct yt8512_priv *priv = phydev->priv;
++
+ #if !(SYS_WAKEUP_BASED_ON_ETH_PKT)
+ 	int value;
+ 

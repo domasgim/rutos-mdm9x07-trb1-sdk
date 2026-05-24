@@ -1,0 +1,20 @@
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -152,7 +152,7 @@ config QCOM_SMEM_STATE
+ config QCOM_SMP2P
+ 	tristate "Qualcomm Shared Memory Point to Point support"
+ 	depends on MAILBOX
+-	depends on QCOM_SMEM
++	depends on MSM_SMEM
+ 	select QCOM_SMEM_STATE
+ 	select IRQ_DOMAIN
+ 	help
+@@ -161,7 +161,7 @@ config QCOM_SMP2P
+ 
+ config QCOM_SMSM
+ 	tristate "Qualcomm Shared Memory State Machine"
+-	depends on QCOM_SMEM
++	depends on MSM_SMEM
+ 	select QCOM_SMEM_STATE
+ 	select IRQ_DOMAIN
+ 	help

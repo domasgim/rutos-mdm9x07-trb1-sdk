@@ -1,0 +1,20 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -1068,15 +1068,15 @@ static void msm_hs_set_bps_locked(struct
+ 	case 2500000:
+ 	case 2000000:
+ 	case 1500000:
+-	case 1152000:
+ 	case 1000000:
+ 	case 921600:
+ 		msm_hs_write(uport, UART_DM_CSR, 0xff);
+ 		rxstale = 31;
+ 		break;
+ 	default:
+-		msm_hs_write(uport, UART_DM_CSR, 0xff);
++		msm_hs_write(uport, UART_DM_CSR, 0x55);
+ 		/* default to 9600 */
++		MSM_HS_WARN("Unsupported UART baud rate - set to 9600 bps\n");
+ 		bps = 9600;
+ 		rxstale = 2;
+ 		break;

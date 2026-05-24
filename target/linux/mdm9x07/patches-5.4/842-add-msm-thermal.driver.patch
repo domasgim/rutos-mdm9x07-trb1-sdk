@@ -1,0 +1,47 @@
+--- a/drivers/thermal/Makefile
++++ b/drivers/thermal/Makefile
+@@ -54,3 +54,4 @@ obj-$(CONFIG_MTK_THERMAL)	+= mtk_thermal
+ obj-$(CONFIG_GENERIC_ADC_THERMAL)	+= thermal-generic-adc.o
+ obj-$(CONFIG_ZX2967_THERMAL)	+= zx2967_thermal.o
+ obj-$(CONFIG_UNIPHIER_THERMAL)	+= uniphier_thermal.o
++obj-$(CONFIG_THERMAL_TSENS)     += msm-tsens.o tsens-dbg.o tsens-mtc.o tsens1xxx.o tsens_calib.o
+--- a/drivers/thermal/Kconfig
++++ b/drivers/thermal/Kconfig
+@@ -396,6 +396,16 @@ config GENERIC_ADC_THERMAL
+ 	  to this driver. This driver reports the temperature by reading ADC
+ 	  channel and converts it to temperature based on lookup table.
+ 
++config THERMAL_TSENS
++        tristate "Qualcomm Technologies Inc. TSENS Temperature driver"
++        depends on THERMAL
++        help
++          This enables the thermal sysfs driver for the TSENS device. It shows  
++          up in Sysfs as a thermal zone with multiple trip points. Also able
++          to set threshold temperature for both warm and cool and update
++          thermal userspace client when a threshold is reached. Warm/Cool
++          temperature thresholds can be set independently for each sensor.
++
+ menu "Qualcomm thermal drivers"
+ depends on (ARCH_QCOM && OF) || COMPILE_TEST
+ source "drivers/thermal/qcom/Kconfig"
+--- a/include/dt-bindings/thermal/thermal.h
++++ b/include/dt-bindings/thermal/thermal.h
+@@ -11,6 +11,7 @@
+ 
+ /* On cooling devices upper and lower limits */
+ #define THERMAL_NO_LIMIT		(~0)
++#define THERMAL_MAX_LIMIT               (THERMAL_NO_LIMIT - 1)
+ 
+ #endif
+ 
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -68,6 +68,8 @@ enum thermal_trip_type {
+ 	THERMAL_TRIP_PASSIVE,
+ 	THERMAL_TRIP_HOT,
+ 	THERMAL_TRIP_CRITICAL,
++	THERMAL_TRIP_CONFIGURABLE_HI,
++	THERMAL_TRIP_CONFIGURABLE_LOW,
+ };
+ 
+ enum thermal_trend {

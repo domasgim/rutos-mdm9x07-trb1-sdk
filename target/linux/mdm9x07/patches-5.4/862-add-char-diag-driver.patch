@@ -1,0 +1,18 @@
+--- a/drivers/char/Makefile
++++ b/drivers/char/Makefile
+@@ -52,4 +52,5 @@ js-rtc-y = rtc.o
+ 
+ obj-$(CONFIG_XILLYBUS)		+= xillybus/
+ obj-$(CONFIG_POWERNV_OP_PANEL)	+= powernv-op-panel.o
++obj-$(CONFIG_DIAG_CHAR)         += diag/
+ obj-$(CONFIG_ADI)		+= adi.o
+--- a/drivers/char/Kconfig
++++ b/drivers/char/Kconfig
+@@ -531,6 +531,7 @@ config MSM_SMD_PKT
+ 	 for MSM chipset.
+ 
+ source "drivers/char/xillybus/Kconfig"
++source "drivers/char/diag/Kconfig"
+ 
+ config ADI
+ 	tristate "SPARC Privileged ADI driver"

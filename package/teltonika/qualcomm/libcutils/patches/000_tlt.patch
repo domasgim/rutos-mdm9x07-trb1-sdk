@@ -1,0 +1,1071 @@
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/Makefile.am src/Makefile.am
+--- upstream/Makefile.am	1970-01-01 00:00:00.000000000 +0000
++++ src/Makefile.am	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,127 @@
++common_sources := hashmap.c
++common_sources += atomic.c.arm
++common_sources += native_handle.c
++common_sources += config_utils.c
++common_sources += load_file.c
++common_sources += strlcpy.c
++common_sources += open_memstream.c
++common_sources += strdup16to8.c
++common_sources += strdup8to16.c
++common_sources += record_stream.c
++common_sources += process_name.c
++common_sources += threads.c
++common_sources += sched_policy.c
++common_sources += iosched_policy.c
++common_sources += str_parms.c
++common_sources += fs_config.c
++
++if HOST_OS_LINUX
++common_sources += fs.c
++common_sources += multiuser.c
++common_sources += socket_inaddr_any_server.c
++common_sources += socket_local_client.c
++common_sources += socket_local_server.c
++common_sources += socket_loopback_client.c
++common_sources += socket_loopback_server.c
++common_sources += socket_network_client.c
++common_sources += sockets.c
++endif
++
++target_sources := android_reboot.c
++target_sources += ashmem-dev.c
++target_sources += debugger.c
++target_sources += klog.c
++target_sources += partition_utils.c
++target_sources += properties.c
++if LE_PROPERTIES
++target_sources += property_ops.c
++endif
++target_sources += qtaguid.c
++target_sources += trace-dev.c
++target_sources += uevent.c
++
++host_sources := ashmem-host.c
++host_sources += trace-host.c
++host_sources += dlmalloc_stubs.c
++
++requiredlibs = -lpthread
++
++# Build libcutils.so
++lib_LTLIBRARIES := libcutils.la
++
++libcutils_la_SOURCES  := $(common_sources)
++libcutils_la_CPPFLAGS := -DHAVE_PTHREADS
++libcutils_la_CPPFLAGS += -DLINUX_ENABLED
++libcutils_la_CPPFLAGS += -D__linux__
++libcutils_la_CPPFLAGS += -D_GNU_SOURCE
++if LE_PROPERTIES
++libcutils_la_CPPFLAGS += -DLE_PROPERTIES
++endif
++libcutils_la_LDFLAGS  := -lpthread
++
++if BUILD_HOST
++libcutils_la_SOURCES  += $(host_sources)
++endif
++
++if BUILD_DEVICE
++libcutils_la_SOURCES  += $(target_sources)
++libcutils_la_CPPFLAGS += -DANDROID_SMP=0
++libcutils_la_CPPFLAGS += -DHAVE_ASM_MEMSET
++endif
++
++if ARM
++libcutils_la_SOURCES  += arch-arm/memset32.S
++endif
++
++if ARM64
++libcutils_la_SOURCES  += arch-arm64/android_memset.S
++endif
++
++libcutils_la_LDFLAGS  := -lpthread
++
++# Export headers
++cutils_includedir=$(includedir)/cutils
++cutils_include_HEADERS := @core_incdir@/cutils/android_reboot.h
++cutils_include_HEADERS += @core_incdir@/cutils/aref.h
++cutils_include_HEADERS += @core_incdir@/cutils/ashmem.h
++cutils_include_HEADERS += @core_incdir@/cutils/atomic.h
++cutils_include_HEADERS += @core_incdir@/cutils/bitops.h
++cutils_include_HEADERS += @core_incdir@/cutils/compiler.h
++cutils_include_HEADERS += @core_incdir@/cutils/config_utils.h
++cutils_include_HEADERS += @core_incdir@/cutils/debugger.h
++cutils_include_HEADERS += @core_incdir@/cutils/fs.h
++cutils_include_HEADERS += @core_incdir@/cutils/hashmap.h
++cutils_include_HEADERS += @core_incdir@/cutils/iosched_policy.h
++cutils_include_HEADERS += @core_incdir@/cutils/jstring.h
++cutils_include_HEADERS += @core_incdir@/cutils/klog.h
++cutils_include_HEADERS += @core_incdir@/cutils/list.h
++cutils_include_HEADERS += @core_incdir@/cutils/log.h
++cutils_include_HEADERS += @core_incdir@/cutils/memory.h
++cutils_include_HEADERS += @core_incdir@/cutils/misc.h
++cutils_include_HEADERS += @core_incdir@/cutils/multiuser.h
++cutils_include_HEADERS += @core_incdir@/cutils/native_handle.h
++cutils_include_HEADERS += @core_incdir@/cutils/open_memstream.h
++cutils_include_HEADERS += @core_incdir@/cutils/partition_utils.h
++cutils_include_HEADERS += @core_incdir@/cutils/process_name.h
++cutils_include_HEADERS += @core_incdir@/cutils/properties.h
++cutils_include_HEADERS += @core_incdir@/cutils/qtaguid.h
++cutils_include_HEADERS += @core_incdir@/cutils/record_stream.h
++cutils_include_HEADERS += @core_incdir@/cutils/sched_policy.h
++cutils_include_HEADERS += @core_incdir@/cutils/sockets.h
++cutils_include_HEADERS += @core_incdir@/cutils/stdatomic.h
++cutils_include_HEADERS += @core_incdir@/cutils/str_parms.h
++cutils_include_HEADERS += @core_incdir@/cutils/threads.h
++cutils_include_HEADERS += @core_incdir@/cutils/trace.h
++cutils_include_HEADERS += @core_incdir@/cutils/uevent.h
++
++cutils_sys_includedir=$(includedir)/cutils/sys
++cutils_sys_include_HEADERS := @core_incdir@/sys/capability.h
++cutils_sys_include_HEADERS += @core_incdir@/sys/system_properties.h
++
++privateheaders_includedir=$(includedir)/private
++privateheaders_include_HEADERS := @core_incdir@/private/android_filesystem_config.h
++privateheaders_include_HEADERS += @core_incdir@/private/android_filesystem_capability.h
++
++pkgconfigdir = $(libdir)/pkgconfig
++pkgconfig_DATA = libcutils.pc
++EXTRA_DIST = $(pkgconfig_DATA)
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/README.md src/README.md
+--- upstream/README.md	1970-01-01 00:00:00.000000000 +0000
++++ src/README.md	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,3 @@
++# libcutils
++
++Build Android libcutils
+\ No newline at end of file
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/android_reboot.c src/android_reboot.c
+--- upstream/android_reboot.c	2017-05-16 23:40:36.000000000 +0000
++++ src/android_reboot.c	2024-07-01 05:17:48.000000000 +0000
+@@ -25,7 +25,9 @@
+ #include <string.h>
+ 
+ #include <cutils/android_reboot.h>
+-
++#ifdef LINUX_ENABLED
++#include <linux/reboot.h>
++#endif
+ #define UNUSED __attribute__((unused))
+ 
+ /* Check to see if /proc/mounts contains any writeable filesystems
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/ashmem-dev.c src/ashmem-dev.c
+--- upstream/ashmem-dev.c	2017-05-16 23:40:36.000000000 +0000
++++ src/ashmem-dev.c	2024-07-01 05:17:48.000000000 +0000
+@@ -27,7 +27,10 @@
+ #include <sys/ioctl.h>
+ #include <fcntl.h>
+ 
++#if !LINUX_ENABLED
+ #include <linux/ashmem.h>
++#endif
++
+ #include <cutils/ashmem.h>
+ 
+ #define ASHMEM_DEVICE	"/dev/ashmem"
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/configure.ac src/configure.ac
+--- upstream/configure.ac	1970-01-01 00:00:00.000000000 +0000
++++ src/configure.ac	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,73 @@
++AC_PREREQ(2.61)
++AC_INIT([libcutils],1.0.0)
++AM_INIT_AUTOMAKE([-Wall gnu foreign])
++AC_CONFIG_SRCDIR([Makefile.am])
++AC_CONFIG_HEADERS([config.h])
++AC_CONFIG_MACRO_DIR([m4])
++
++# Check for programs
++AM_PROG_AS
++AC_PROG_CC
++AM_PROG_CC_C_O
++AC_PROG_LIBTOOL
++AC_PROG_AWK
++AC_PROG_CPP
++AC_PROG_CXX
++AC_PROG_INSTALL
++AC_PROG_LN_S
++AC_PROG_MAKE_SET
++PKG_PROG_PKG_CONFIG
++
++AC_ARG_WITH([core_includes],
++    AC_HELP_STRING([--with-core-includes=@<:@dir@:>@],
++       [Specify the location of the core headers]),
++    [core_incdir=$withval],
++    with_core_includes=no)
++
++if test "x$with_core_includes" != "xno"; then
++   CPPFLAGS="${CPPFLAGS} -I${core_incdir}"
++   AC_SUBST(core_incdir,${core_incdir})
++fi
++
++AS_CASE([$host],
++        [arm*], [ARM=yes],
++        [ARM=no]
++)
++AM_CONDITIONAL(ARM, [test "x$ARM" = "xyes"])
++
++AS_CASE([$host],
++        [aarch64*], [ARM64=yes],
++        [ARM64=no]
++)
++AM_CONDITIONAL(ARM64, [test "x$ARM64" = "xyes"])
++
++AS_CASE([$host],
++        [x86_64*], [X86_64=yes],
++        [X86_64=no]
++)
++AM_CONDITIONAL(X86_64, [test "x$X86_64" = "xyes"])
++
++AM_CONDITIONAL(BUILD_HOST, [test "x$X86_64" = "xyes"])
++AM_CONDITIONAL(BUILD_DEVICE, [test "x$ARM$ARM64" != "xnono"])
++
++AC_ARG_WITH([host-os],
++        [AS_HELP_STRING([--with-host-os=HOST_OS],[Host OS to build adb host.(default: linux)])],
++        [HOST_OS="$withval"],
++        [HOST_OS='linux'])
++
++if test "x$HOST_OS" = "xlinux-gnueabi"; then
++  HOST_OS=linux
++else
++  AC_MSG_NOTICE([Unknown host OS $HOST_OS detected.])
++fi
++
++AM_CONDITIONAL([HOST_OS_LINUX], [test "x$HOST_OS" = "xlinux"])
++
++AM_CONDITIONAL(LE_PROPERTIES, [test "x$LE_PROPERTIES_ENABLED" = "xtrue"])
++
++AC_CONFIG_FILES([ \
++    Makefile \
++    libcutils.pc
++])
++AC_OUTPUT
++
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/fs_config.c src/fs_config.c
+--- upstream/fs_config.c	2017-05-16 23:40:36.000000000 +0000
++++ src/fs_config.c	2024-07-01 05:17:48.000000000 +0000
+@@ -75,7 +75,7 @@
+ */
+ 
+ static const struct fs_path_config android_dirs[] = {
+-    { 00770, AID_SYSTEM, AID_CACHE,  0, "cache" },
++/*    { 00770, AID_SYSTEM, AID_CACHE,  0, "cache" },
+     { 00771, AID_SYSTEM, AID_SYSTEM, 0, "data/app" },
+     { 00771, AID_SYSTEM, AID_SYSTEM, 0, "data/app-private" },
+     { 00771, AID_ROOT,   AID_ROOT,   0, "data/dalvik-cache" },
+@@ -95,6 +95,12 @@
+     { 00755, AID_ROOT,   AID_ROOT,   0, "system/etc/ppp" },
+     { 00755, AID_ROOT,   AID_SHELL,  0, "vendor" },
+     { 00777, AID_ROOT,   AID_ROOT,   0, "sdcard" },
++*/
++
++    { 00770, AID_WWWDATA,   AID_WWWDATA,   0, "system/WEBSERVER" },
++    { 00770, AID_WWWDATA,   AID_WWWDATA,   0, "system/www" },
++    { 01755, AID_ROOT,      AID_ROOT,      0, "system/tmp" },
++
+     { 00755, AID_ROOT,   AID_ROOT,   0, 0 },
+ };
+ 
+@@ -108,6 +114,7 @@
+ static const char conf_file[] = "/system/etc/fs_config_files";
+ 
+ static const struct fs_path_config android_files[] = {
++#if 0
+     { 00440, AID_ROOT,      AID_SHELL,     0, "system/etc/init.goldfish.rc" },
+     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.goldfish.sh" },
+     { 00550, AID_ROOT,      AID_SHELL,     0, "system/etc/init.ril" },
+@@ -135,7 +142,8 @@
+ 
+     { 00750, AID_ROOT,      AID_ROOT,      0, "system/bin/uncrypt" },
+     { 00750, AID_ROOT,      AID_ROOT,      0, "system/bin/install-recovery.sh" },
+-    { 00755, AID_ROOT,      AID_SHELL,     0, "system/bin/*" },
++    /* { 00755, AID_ROOT,      AID_SHELL,     0, "system/bin/*" }, */
++
+     { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib/valgrind/*" },
+     { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib64/valgrind/*" },
+     { 00755, AID_ROOT,      AID_SHELL,     0, "system/xbin/*" },
+@@ -146,6 +154,133 @@
+     { 00750, AID_ROOT,      AID_SHELL,     0, "init*" },
+     { 00750, AID_ROOT,      AID_SHELL,     0, "sbin/fs_mgr" },
+     { 00640, AID_ROOT,      AID_SHELL,     0, "fstab.*" },
++#endif
++    /* rootfs permissions */
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/system" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/system/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc0.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc1.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc2.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc3.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc4.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc5.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rc6.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/rcS.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/avahi/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/disconnect" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/group-" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/gshadow" },
++    { 00750, AID_ROOT,      AID_ROOT,      0, "system/etc/init.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/ipk-postinsts/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/launch_adbd" },
++    { 00711, AID_ROOT,      AID_ROOT,      0, "system/etc/mdev/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/network/if-down-up.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/network/if-post-down.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/network/if-pre-up.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/network/if-up.d/*" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/passwd-" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/ppp/chap-secrets" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/ppp/pap-secrets" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/ppp/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/bluetooth/*" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/securetty" },
++    { 00600, AID_ROOT,      AID_ROOT,      0, "system/etc/shadow" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/udhcpc.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/udev/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/udev/scripts/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/share/udhcpc/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/initscripts/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/etc/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/depmod.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/modprobe.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/modules-load.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/sysctl.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/systemd/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/tmpfiles.d/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/etc/xdg/*" },
++
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/bin/busybox" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/bin/su.shadow" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/journalctl" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/kmod" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/loginctl" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/machinectl" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/bin/mount.util-linux" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemctl" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-ask-password" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-escape" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-firstboot" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-hwdb" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-inhibit" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-machine-id-setup" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-notify" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-sysusers" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-tmpfiles" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/systemd-tty-ask-password-agent" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/udevadm" },
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib/busybox/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib/busybox/bin/*" },
++
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/sbin/halt.sysvinit" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/sbin/shutdown.sysvinit" },
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/tests/*" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/chage" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/chfn.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/chsh.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/expiry" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/su" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/gpasswd" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/newgidmap" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/newgrp.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/newuidmap" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/passwd.shadow" },
++
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib/dbus/dbus-daemon-launch-helper" },
++
++    { 04755, AID_ROOT,      AID_ROOT,      0, "system/usr/sbin/pppd" },
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/bin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/sbin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/libexec/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/kernel-tests/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/kernel-tests/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/data/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/etc/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib64/*" },
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/share/qt5/*" },
++
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/usr/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/bin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/sbin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/lib64/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/lib/depmod.d/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/lib/modprobe.d/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/lib/systemd/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "system/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "system/usr/lib/busybox/sbin/*" },
++    /* /usr permissions */
++
++    /* suid binaries */
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/chage" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/chfn.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/chsh.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/newgrp.shadow" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/su" },
++    { 04755, AID_ROOT,      AID_ROOT,      0, "userdata/sbin/pppd" },
++
++    { 00755, AID_ROOT,      AID_ROOT,      0, "userdata/bin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "userdata/sbin/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "userdata/lib/*" },
++    { 00755, AID_ROOT,      AID_ROOT,      0, "userdata/kernel-tests/*" },
++    { 00644, AID_ROOT,      AID_ROOT,      0, "userdata/*" },
++
+     { 00644, AID_ROOT,      AID_ROOT,      0, 0 },
+ };
+ 
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/klog.c src/klog.c
+--- upstream/klog.c	2017-05-16 23:40:36.000000000 +0000
++++ src/klog.c	2024-07-01 05:17:48.000000000 +0000
+@@ -22,13 +22,19 @@
+ #include <string.h>
+ #include <sys/stat.h>
+ #include <sys/types.h>
+-#include <unistd.h>
++#include <log/log.h>
+ 
+ #include <cutils/klog.h>
++#include <cutils/fs.h>
+ 
+ static int klog_fd = -1;
+ static int klog_level = KLOG_DEFAULT_LEVEL;
+ 
++int __android_log_print(int prio, const char *tag, const char *fmt, ...)
++{
++        /* unused */
++}
++
+ int klog_get_level(void) {
+     return klog_level;
+ }
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/libcutils.pc.in src/libcutils.pc.in
+--- upstream/libcutils.pc.in	1970-01-01 00:00:00.000000000 +0000
++++ src/libcutils.pc.in	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,10 @@
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@
++includedir=@includedir@
++
++Name: cutils
++Description: cutils library
++Version: @VERSION@
++Libs: -L${libdir} -lcutils
++Cflags: -I${includedir}
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/properties.c src/properties.c
+--- upstream/properties.c	2017-05-16 23:40:36.000000000 +0000
++++ src/properties.c	2024-07-01 05:17:48.000000000 +0000
+@@ -1,156 +1,111 @@
+-/*
+- * Copyright (C) 2006 The Android Open Source Project
+- *
+- * Licensed under the Apache License, Version 2.0 (the "License");
+- * you may not use this file except in compliance with the License.
+- * You may obtain a copy of the License at
+- *
+- *      http://www.apache.org/licenses/LICENSE-2.0
+- *
+- * Unless required by applicable law or agreed to in writing, software
+- * distributed under the License is distributed on an "AS IS" BASIS,
+- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+- * See the License for the specific language governing permissions and
+- * limitations under the License.
+- */
+-
+-#define LOG_TAG "properties"
+-// #define LOG_NDEBUG 0
+-
+-#include <stdlib.h>
+-#include <string.h>
+-#include <ctype.h>
+-#include <unistd.h>
+-#include <cutils/sockets.h>
+-#include <errno.h>
+-#include <assert.h>
+-
+-#include <cutils/properties.h>
+-#include <stdbool.h>
+-#include <inttypes.h>
+-#include <log/log.h>
+-
+-int8_t property_get_bool(const char *key, int8_t default_value) {
+-    if (!key) {
+-        return default_value;
+-    }
+-
+-    int8_t result = default_value;
+-    char buf[PROPERTY_VALUE_MAX] = {'\0',};
+-
+-    int len = property_get(key, buf, "");
+-    if (len == 1) {
+-        char ch = buf[0];
+-        if (ch == '0' || ch == 'n') {
+-            result = false;
+-        } else if (ch == '1' || ch == 'y') {
+-            result = true;
+-        }
+-    } else if (len > 1) {
+-         if (!strcmp(buf, "no") || !strcmp(buf, "false") || !strcmp(buf, "off")) {
+-            result = false;
+-        } else if (!strcmp(buf, "yes") || !strcmp(buf, "true") || !strcmp(buf, "on")) {
+-            result = true;
+-        }
+-    }
+-
+-    return result;
+-}
+-
+-// Convert string property to int (default if fails); return default value if out of bounds
+-static intmax_t property_get_imax(const char *key, intmax_t lower_bound, intmax_t upper_bound,
+-        intmax_t default_value) {
+-    if (!key) {
+-        return default_value;
+-    }
+-
+-    intmax_t result = default_value;
+-    char buf[PROPERTY_VALUE_MAX] = {'\0',};
+-    char *end = NULL;
+-
+-    int len = property_get(key, buf, "");
+-    if (len > 0) {
+-        int tmp = errno;
+-        errno = 0;
+-
+-        // Infer base automatically
+-        result = strtoimax(buf, &end, /*base*/0);
+-        if ((result == INTMAX_MIN || result == INTMAX_MAX) && errno == ERANGE) {
+-            // Over or underflow
+-            result = default_value;
+-            ALOGV("%s(%s,%" PRIdMAX ") - overflow", __FUNCTION__, key, default_value);
+-        } else if (result < lower_bound || result > upper_bound) {
+-            // Out of range of requested bounds
+-            result = default_value;
+-            ALOGV("%s(%s,%" PRIdMAX ") - out of range", __FUNCTION__, key, default_value);
+-        } else if (end == buf) {
+-            // Numeric conversion failed
+-            result = default_value;
+-            ALOGV("%s(%s,%" PRIdMAX ") - numeric conversion failed",
+-                    __FUNCTION__, key, default_value);
+-        }
+-
+-        errno = tmp;
+-    }
+-
+-    return result;
+-}
+-
+-int64_t property_get_int64(const char *key, int64_t default_value) {
+-    return (int64_t)property_get_imax(key, INT64_MIN, INT64_MAX, default_value);
+-}
+-
+-int32_t property_get_int32(const char *key, int32_t default_value) {
+-    return (int32_t)property_get_imax(key, INT32_MIN, INT32_MAX, default_value);
+-}
+-
+-#define _REALLY_INCLUDE_SYS__SYSTEM_PROPERTIES_H_
+-#include <sys/_system_properties.h>
+-
+-int property_set(const char *key, const char *value)
+-{
+-    return __system_property_set(key, value);
+-}
+-
+-int property_get(const char *key, char *value, const char *default_value)
+-{
+-    int len;
+-
+-    len = __system_property_get(key, value);
+-    if(len > 0) {
+-        return len;
+-    }
+-    if(default_value) {
+-        len = strlen(default_value);
+-        if (len >= PROPERTY_VALUE_MAX) {
+-            len = PROPERTY_VALUE_MAX - 1;
+-        }
+-        memcpy(value, default_value, len);
+-        value[len] = '\0';
+-    }
+-    return len;
+-}
+-
+-struct property_list_callback_data
+-{
+-    void (*propfn)(const char *key, const char *value, void *cookie);
+-    void *cookie;
+-};
+-
+-static void property_list_callback(const prop_info *pi, void *cookie)
+-{
+-    char name[PROP_NAME_MAX];
+-    char value[PROP_VALUE_MAX];
+-    struct property_list_callback_data *data = cookie;
+-
+-    __system_property_read(pi, name, value);
+-    data->propfn(name, value, data->cookie);
+-}
+-
+-int property_list(
+-        void (*propfn)(const char *key, const char *value, void *cookie),
+-        void *cookie)
+-{
+-    struct property_list_callback_data data = { propfn, cookie };
+-    return __system_property_foreach(property_list_callback, &data);
+-}
++/*
++ * Copyright (C) 2006 The Android Open Source Project
++ *
++ * Licensed under the Apache License, Version 2.0 (the "License");
++ * you may not use this file except in compliance with the License.
++ * You may obtain a copy of the License at
++ *
++ *      http://www.apache.org/licenses/LICENSE-2.0
++ *
++ * Unless required by applicable law or agreed to in writing, software
++ * distributed under the License is distributed on an "AS IS" BASIS,
++ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++ * See the License for the specific language governing permissions and
++ * limitations under the License.
++ */
++
++#include <cutils/properties.h>
++#include <string.h>
++#include <stdio.h>
++#include "property_ops.h"
++
++int leproperty_get(const char *key, char *value, const char *default_value) {
++    int rc = 0;
++#ifdef LE_PROPERTIES
++    if(get_property_value(key,value) == true)
++        rc = strlen(value);
++    if( rc > 0) {
++      return rc;
++    }
++#endif
++    if (NULL != default_value) {
++        rc = sprintf(value, "%.*s", PROPERTY_VALUE_MAX - 1, default_value);
++    }
++    return rc;
++}
++int property_get(const char *key, char *value, const char *default_value) {
++    int rc = 0;
++    if (NULL != default_value) {
++        rc = sprintf(value, "%.*s", PROPERTY_VALUE_MAX - 1, default_value);
++    }
++
++    return rc;
++}
++
++int leproperty_set(const char *key, const char *value)
++{
++#ifdef LE_PROPERTIES
++    char prop_name[PROP_NAME_MAX];
++    char prop_value[PROP_VALUE_MAX];
++
++    if (key == 0) return -1;
++    if (value == 0) value = "";
++    if (strlen(key) >= PROP_NAME_MAX) return -1;
++    if (strlen(value) >= PROP_VALUE_MAX) return -1;
++
++    memset(prop_name, 0, sizeof prop_name);
++    memset(prop_value, 0, sizeof prop_value);
++
++    strlcpy(prop_name, key, sizeof prop_name);
++    strlcpy(prop_value, value, sizeof prop_value);
++
++    bool ret = set_property_value(prop_name, prop_value);
++    if(ret){
++        printf("set_property_value success\n");
++    }
++    else{
++        printf("set_property_value failed\n");
++    }
++#endif
++    return 0;
++}
++int property_set(const char *key, const char *value)
++{
++    return 0;
++}
++
++int8_t property_get_bool(const char *key, int8_t default_value) {
++
++    if (!key) {
++        return default_value;
++    }
++
++    int8_t result = default_value;
++    char buf[PROPERTY_VALUE_MAX] = {'\0',};
++
++    int len = property_get(key, buf, "");
++    if (len == 1) {
++        char ch = buf[0];
++        if (ch == '0' || ch == 'n') {
++            result = false;
++        } else if (ch == '1' || ch == 'y') {
++            result = true;
++        }
++    } else if (len > 1) {
++         if (!strcmp(buf, "no") || !strcmp(buf, "false") || !strcmp(buf, "off")) {
++            result = false;
++        } else if (!strcmp(buf, "yes") || !strcmp(buf, "true") || !strcmp(buf, "on")) {
++            result = true;
++        }
++    }
++
++    return result;
++
++}
++
++void dump_properties(void) {
++#ifdef LE_PROPERTIES
++    dump_persist();
++#endif
++}
++
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/property_ops.c src/property_ops.c
+--- upstream/property_ops.c	1970-01-01 00:00:00.000000000 +0000
++++ src/property_ops.c	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,199 @@
++/******************************************************************************
++ *
++ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above
++ *     copyright notice, this list of conditions and the following
++ *     disclaimer in the documentation and/or other materials provided
++ *     with the distribution.
++ *   * Neither the name of The Linux Foundation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
++ *
++ *****************************************************************************/
++
++#include <stdio.h>
++#include <stdbool.h>
++#include <string.h>
++#include <malloc.h>
++#include <poll.h>
++#include <grp.h>
++#include <sys/un.h>
++#include <cutils/sockets.h>
++#include "property_ops.h"
++#include <log/log.h>
++
++static int open_prop_socket()
++{
++    int fd, ret = 0;
++
++    fd = socket(PF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0);
++    if (fd < 0) {
++        ret = -errno;
++    } else {
++        struct sockaddr_un un;
++        memset(&un, 0, sizeof(struct sockaddr_un));
++        un.sun_family = AF_UNIX;
++        snprintf(un.sun_path, sizeof(un.sun_path),
++                        ANDROID_SOCKET_DIR"/%s", PROP_SERVICE_NAME);
++
++    if (TEMP_FAILURE_RETRY(connect(fd, (struct sockaddr *)&un,
++                                       sizeof(struct sockaddr_un))) < 0) {
++            ALOGE("Failed to connect to %s socket", PROP_SERVICE_NAME);
++            close(fd);
++            ret = -errno;
++        } else {
++        ret = fd;  // return socket fd.
++        }
++    }
++    return ret;
++}
++
++static int send_setprop_msg(const char *msg)
++{
++    int fd, ret = 0;
++
++    fd = open_prop_socket();
++    if (fd < 0) {
++       ALOGE("Failed to open Socket");
++       return fd; // pass error back to caller.
++    }
++
++    int msg_len = strlen(msg);
++    const int num_bytes = TEMP_FAILURE_RETRY(send(fd, msg, msg_len, MSG_NOSIGNAL));
++
++    if (num_bytes == msg_len) {
++        // Successfully wrote to the property service but now wait
++        // for 250 ms for property service to finish its work. It
++        // acknowledges its completion by closing the socket.
++        struct pollfd pollfds[1];
++        pollfds[0].fd = fd;
++        pollfds[0].events = 0;
++        const int poll_result = TEMP_FAILURE_RETRY(poll(pollfds, 1, 250 /* ms */));
++        if (poll_result == 1 && (pollfds[0].revents & POLLHUP) != 0) {
++            ret = 0;
++        } else {
++            ALOGE("setprop poll timed out");
++            ret = 0; // Ignore timeout and treat it like a success.
++        }
++        LOG("Sent %d bytes of data (%s) to Socket", num_bytes, msg);
++    }
++    close(fd);
++    return ret;
++}
++
++static int send_getprop_msg(const char *msg, char *resp)
++{
++    int fd = open_prop_socket();
++    if (fd < 0) {
++       ALOGE("Failed to open Socket");
++       return fd; // pass error back to caller.
++    }
++
++    int ret = 0;
++    int msg_len = strlen(msg);
++    const int num_bytes = TEMP_FAILURE_RETRY(send(fd, msg, msg_len, MSG_NOSIGNAL));
++
++    if (num_bytes == msg_len) {
++        // Successfully wrote to the property service but now wait
++        // for 250 ms for property service to finish its work. It
++        // acknowledges its completion by closing the socket.
++        struct pollfd pollfds[1];
++        pollfds[0].fd = fd;
++        pollfds[0].events = 0;
++        const int poll_result = TEMP_FAILURE_RETRY(poll(pollfds, 1, 250 /* ms */));
++        if (poll_result == 1 && (pollfds[0].revents & POLLHUP) != 0) {
++            //Handle data sent from service
++            char recv_buf[MAX_ALLOWED_LINE_LEN+1];
++            memset(recv_buf, 0 , sizeof(recv_buf));
++            int nbytes = recv(fd, recv_buf, sizeof(recv_buf), 0);
++            if (nbytes <= 0) {
++                ALOGE("recv failed (%s)",strerror(errno));
++                ret = -1;
++            } else {
++                recv_buf[nbytes] = '\0';
++                LOG("Received %d bytes of data (%s) from Socket",nbytes, recv_buf);
++                int i = 1;
++                while(i < strlen(recv_buf)){
++                    resp[i-1] = recv_buf[i];
++                    i++;
++                }
++                ret = 0;
++            }
++        } else {
++            ALOGE("getprop poll timed out");
++            ret = -1; // Don't try to recv in case of time out.
++        }
++    }
++    close(fd);
++    return ret;
++}
++
++bool set_property_value(const char* prop_name, unsigned char *prop_val)
++{
++    const char msg[MAX_ALLOWED_LINE_LEN+1]; // +1 for msg type.
++    memset(msg, 0 , sizeof msg);
++
++    snprintf(msg, MAX_ALLOWED_LINE_LEN+1, "%c%s=%s",
++             PROP_MSG_SETPROP, prop_name, prop_val);
++
++    const int err = send_setprop_msg(&msg);
++    if (err < 0) {
++       ALOGE("Failed to send message to Set %s", prop_name);
++       return false;
++    }
++
++    return true;
++}
++
++bool get_property_value(const char* prop_name, unsigned char *prop_val)
++{
++    const char msg[MAX_ALLOWED_LINE_LEN+1]; // +1 for msg type.
++    char resp[MAX_ALLOWED_LINE_LEN];
++
++    memset(msg,  0 , sizeof(msg));
++    memset(resp, 0 , sizeof(resp));
++
++    snprintf(msg, sizeof msg, "%c%s=",
++            PROP_MSG_GETPROP, prop_name);
++
++    const int err = send_getprop_msg(&msg, &resp);
++    if (err < 0) {
++       LOG("Failed to send message to Get %s", prop_name);
++       return false;
++    }
++
++    // Extract prop value from response.
++    char *delimiter = strchr(resp, '=');
++    const char *curr_line_ptr = delimiter+1; //+1 for delimiter
++    if(strlen(curr_line_ptr) <= 0) {
++        LOG("%s has invalid length", prop_name);
++        return false;
++    }
++
++    strlcpy(prop_val, curr_line_ptr, PROP_VALUE_MAX);
++
++    return true;
++}
++
++void dump_persist(void)
++{
++    //TO BE IMPLEMENTED
++}
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/property_ops.h src/property_ops.h
+--- upstream/property_ops.h	1970-01-01 00:00:00.000000000 +0000
++++ src/property_ops.h	2024-07-01 05:17:48.000000000 +0000
+@@ -0,0 +1,88 @@
++/******************************************************************************
++ *
++ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are
++ * met:
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above
++ *     copyright notice, this list of conditions and the following
++ *     disclaimer in the documentation and/or other materials provided
++ *     with the distribution.
++ *   * Neither the name of The Linux Foundation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED "AS IS" AND ANY EXPRESS OR IMPLIED
++ * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
++ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NON-INFRINGEMENT
++ * ARE DISCLAIMED.  IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS
++ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR
++ * BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
++ * WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE
++ * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN
++ * IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE
++ *
++ *****************************************************************************/
++
++#ifndef LE_PROP_OPS_H
++#define LE_PROP_OPS_H
++
++#include <stdbool.h>
++#include <log/log.h>
++
++#include "sys/system_properties.h"
++
++/***********************************************************************
++**  Type definitions
++***********************************************************************/
++#define MAX_ALLOWED_LINE_LEN        (PROP_NAME_MAX+PROP_VALUE_MAX+1)
++#define MAX_PROPERTY_ITER           (2)
++#define MAX_NUM_PROPERTIES          (10)
++
++#define PROP_MSG_GETPROP '0'
++#define PROP_MSG_SETPROP '1'
++
++#define PROP_SERVICE_NAME "leprop-service"
++
++#undef  LOG_TAG
++#define LOG_TAG "leprop"
++
++#undef LOG_DEBUG
++//#define LOG_DEBUG
++
++#undef LOG
++#ifdef LOG_DEBUG
++  #define LOG(fmt, args...) \
++      ALOGD("%s:%d " fmt "\n", __func__, __LINE__, ##args)
++#else
++  #define LOG(fmt, args...) do {} while(0)
++#endif
++
++#define UNUSED(x) (void)(x)
++
++/***********************************************************************
++**  Exposed Functions
++***********************************************************************/
++
++/**
++ * Get the property value for a given property name
++ * @param Char * for property name
++ * @param Char * for getting the property value from database/persist
++ * @return True on success and false otherwise
++ */
++bool get_property_value(const char*, unsigned char *);
++
++/**
++ * Set the property value for a given property name
++ * @param Char * for property name
++ * @param Char * this is not used for set, used only for get
++ * @return True on success and false otherwise
++ */
++bool set_property_value(const char*, unsigned char *);
++
++#endif /* LE_PROP_OPS_H */
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/record_stream.c src/record_stream.c
+--- upstream/record_stream.c	2017-05-16 23:40:36.000000000 +0000
++++ src/record_stream.c	2024-07-01 05:17:48.000000000 +0000
+@@ -49,6 +49,8 @@
+     assert (maxRecordLen <= 0xffff);
+ 
+     ret = (RecordStream *)calloc(1, sizeof(RecordStream));
++    if (ret == NULL)
++        return NULL;
+ 
+     ret->fd = fd;
+     ret->maxRecordLen = maxRecordLen;
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/trace-dev.c src/trace-dev.c
+--- upstream/trace-dev.c	2017-05-16 23:40:36.000000000 +0000
++++ src/trace-dev.c	2024-07-01 05:17:48.000000000 +0000
+@@ -18,7 +18,7 @@
+ #include <fcntl.h>
+ #include <limits.h>
+ #include <pthread.h>
+-#include <stdatomic.h>
++#include <cutils/stdatomic.h>
+ #include <stdbool.h>
+ #include <stdlib.h>
+ #include <string.h>
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/uevent.c src/uevent.c
+--- upstream/uevent.c	2017-05-16 23:40:36.000000000 +0000
++++ src/uevent.c	2024-07-01 05:17:48.000000000 +0000
+@@ -26,6 +26,18 @@
+ 
+ #include <linux/netlink.h>
+ 
++#if defined(LINUX_ENABLED) && !defined(_GNU_SOURCE)
++
++struct ucred
++{
++  pid_t pid;                    /* PID of sending process.  */
++  uid_t uid;                    /* UID of sending process.  */
++  gid_t gid;                    /* GID of sending process.  */
++};
++#define SCM_CREDENTIALS 0x02
++
++#endif  /* LINUX_ENABLED */
++
+ /**
+  * Like recv(), but checks that messages actually originate from the kernel.
+  */

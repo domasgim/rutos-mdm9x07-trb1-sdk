@@ -1,0 +1,32 @@
+From e6e6fee377b96475720186a75935f05ac38f109d Mon Sep 17 00:00:00 2001
+From: Kristupas Savickas <kristupas.savickas@teltonika.lt>
+Date: Wed, 21 Aug 2019 14:29:45 +0300
+Subject: [PATCH] fix invalid magic number message
+
+---
+ app/aboot/boot_cfg.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/app/aboot/boot_cfg.c b/app/aboot/boot_cfg.c
+index 4da50d5..5853ac3 100644
+--- a/app/aboot/boot_cfg.c
++++ b/app/aboot/boot_cfg.c
+@@ -44,7 +44,7 @@ static int boot_cfg_raw_is_valid(struct boot_cfg_raw *cfg)
+ {
+ 	if (cfg->magic != BOOT_CFG_MAGIC) {
+ 		dprintf(CRITICAL, "Magic number missmatch (got 0x%0X, expected 0x%0X)\n",
+-			BOOT_CFG_MAGIC);
++			cfg->magic, BOOT_CFG_MAGIC);
+ 		return 0;
+ 	}
+ 
+@@ -153,4 +153,4 @@ char *boot_cfg_cmdline_parse(const char *cmdline, enum boot_cfg cfg)
+ 	}
+ 
+ 	return final;
+-}
+\ No newline at end of file
++}
+-- 
+2.23.0
+

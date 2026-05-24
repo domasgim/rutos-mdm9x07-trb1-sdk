@@ -1,0 +1,131 @@
+--- a/drivers/usb/phy/Makefile
++++ b/drivers/usb/phy/Makefile
+@@ -15,6 +15,7 @@ obj-$(CONFIG_TAHVO_USB)			+= phy-tahvo.o
+ obj-$(CONFIG_AM335X_CONTROL_USB)	+= phy-am335x-control.o
+ obj-$(CONFIG_AM335X_PHY_USB)		+= phy-am335x.o
+ obj-$(CONFIG_OMAP_OTG)			+= phy-omap-otg.o
++obj-$(CONFIG_USB_MSM_OTG)               += phy-msm-usb.o
+ obj-$(CONFIG_TWL6030_USB)		+= phy-twl6030-usb.o
+ obj-$(CONFIG_USB_TEGRA_PHY)		+= phy-tegra-usb.o
+ obj-$(CONFIG_USB_GPIO_VBUS)		+= phy-gpio-vbus-usb.o
+--- a/drivers/usb/phy/Kconfig
++++ b/drivers/usb/phy/Kconfig
+@@ -44,6 +44,22 @@ config ISP1301_OMAP
+ 	  This driver can also be built as a module.  If so, the module
+ 	  will be called phy-isp1301-omap.
+ 
++config USB_MSM_OTG
++        tristate "Qualcomm on-chip USB OTG controller support"
++        depends on (USB || USB_GADGET) && (ARCH_QCOM || COMPILE_TEST)
++        depends on USB_GADGET || !USB_GADGET # if USB_GADGET=m, this can't be 'y'
++        depends on RESET_CONTROLLER
++        select USB_PHY
++        help
++          Enable this to support the USB OTG transceiver on Qualcomm chips. It
++          handles PHY initialization, clock management, and workarounds
++          required after resetting the hardware and power management.
++          This driver is required even for peripheral only or host only
++          mode configurations.
++          This driver is not supported on boards like trout which
++          has an external PHY.
++
++
+ config KEYSTONE_USB_PHY
+ 	tristate "Keystone USB PHY Driver"
+ 	depends on ARCH_KEYSTONE || COMPILE_TEST
+--- a/include/linux/power_supply.h
++++ b/include/linux/power_supply.h
+@@ -39,6 +39,22 @@ enum {
+ 	POWER_SUPPLY_STATUS_FULL,
+ };
+ 
++enum {
++	POWER_SUPPLY_DP_DM_UNKNOWN = 0,
++	POWER_SUPPLY_DP_DM_PREPARE = 1,
++	POWER_SUPPLY_DP_DM_UNPREPARE = 2,
++	POWER_SUPPLY_DP_DM_CONFIRMED_HVDCP3 = 3,
++	POWER_SUPPLY_DP_DM_DP_PULSE = 4,
++	POWER_SUPPLY_DP_DM_DM_PULSE = 5,
++	POWER_SUPPLY_DP_DM_DP0P6_DMF = 6,
++	POWER_SUPPLY_DP_DM_DP0P6_DM3P3 = 7,
++	POWER_SUPPLY_DP_DM_DPF_DMF = 8,
++	POWER_SUPPLY_DP_DM_DPR_DMR = 9,
++	POWER_SUPPLY_DP_DM_HVDCP3_SUPPORTED = 10,
++	POWER_SUPPLY_DP_DM_ICL_DOWN = 11,
++	POWER_SUPPLY_DP_DM_ICL_UP = 12,
++};
++
+ /* What algorithm is the charger using? */
+ enum {
+ 	POWER_SUPPLY_CHARGE_TYPE_UNKNOWN = 0,
+@@ -162,6 +178,12 @@ enum power_supply_property {
+ 	POWER_SUPPLY_PROP_MODEL_NAME,
+ 	POWER_SUPPLY_PROP_MANUFACTURER,
+ 	POWER_SUPPLY_PROP_SERIAL_NUMBER,
++	POWER_SUPPLY_PROP_REAL_TYPE,
++	POWER_SUPPLY_PROP_SDP_CURRENT_MAX,
++	POWER_SUPPLY_PROP_CHARGING_ENABLED,
++	POWER_SUPPLY_PROP_INPUT_CURRENT_MAX,
++	POWER_SUPPLY_PROP_DP_DM,
++	POWER_SUPPLY_PROP_USB_OTG,
+ };
+ 
+ enum power_supply_type {
+@@ -173,10 +195,12 @@ enum power_supply_type {
+ 	POWER_SUPPLY_TYPE_USB_DCP,		/* Dedicated Charging Port */
+ 	POWER_SUPPLY_TYPE_USB_CDP,		/* Charging Downstream Port */
+ 	POWER_SUPPLY_TYPE_USB_ACA,		/* Accessory Charger Adapters */
++	POWER_SUPPLY_TYPE_USB_HVDCP,		/* High Voltage DCP */
+ 	POWER_SUPPLY_TYPE_USB_TYPE_C,		/* Type C Port */
+ 	POWER_SUPPLY_TYPE_USB_PD,		/* Power Delivery Port */
+ 	POWER_SUPPLY_TYPE_USB_PD_DRP,		/* PD Dual Role Port */
+ 	POWER_SUPPLY_TYPE_APPLE_BRICK_ID,	/* Apple Charging Method */
++	POWER_SUPPLY_TYPE_USB_FLOAT,            /* Floating charger */
+ };
+ 
+ enum power_supply_usb_type {
+--- a/include/linux/usb/phy.h
++++ b/include/linux/usb/phy.h
+@@ -15,6 +15,10 @@
+ #include <linux/usb.h>
+ #include <uapi/linux/usb/charger.h>
+ 
++#define ENABLE_DP_MANUAL_PULLUP BIT(0)
++#define ENABLE_SECONDARY_PHY    BIT(1)
++#define PHY_SOFT_CONNECT        BIT(12)
++
+ enum usb_phy_interface {
+ 	USBPHY_INTERFACE_MODE_UNKNOWN,
+ 	USBPHY_INTERFACE_MODE_UTMI,
+@@ -47,6 +51,8 @@ enum usb_otg_state {
+ 	OTG_STATE_B_IDLE,
+ 	OTG_STATE_B_SRP_INIT,
+ 	OTG_STATE_B_PERIPHERAL,
++	OTG_STATE_B_SUSPEND,
++	OTG_STATE_B_CHARGER,
+ 
+ 	/* extra dual-role default-b states */
+ 	OTG_STATE_B_WAIT_ACON,
+@@ -155,6 +161,10 @@ struct usb_phy {
+ 	 * manually detect the charger type.
+ 	 */
+ 	enum usb_charger_type (*charger_detect)(struct usb_phy *x);
++
++	/* for notification of usb_phy_dbg_events */
++	void    (*dbg_event)(struct usb_phy *x,
++			char *event, int msg1, int msg2);
+ };
+ 
+ /* for board-specific init logic */
+--- a/drivers/power/supply/power_supply_sysfs.c
++++ b/drivers/power/supply/power_supply_sysfs.c
+@@ -307,6 +307,9 @@ static struct device_attribute power_sup
+ 	POWER_SUPPLY_ATTR(precharge_current),
+ 	POWER_SUPPLY_ATTR(charge_term_current),
+ 	POWER_SUPPLY_ATTR(calibrate),
++	POWER_SUPPLY_ATTR(input_current_max),
++	POWER_SUPPLY_ATTR(dp_dm),
++	POWER_SUPPLY_ATTR(usb_otg),
+ 	/* Properties of type `const char *' */
+ 	POWER_SUPPLY_ATTR(model_name),
+ 	POWER_SUPPLY_ATTR(manufacturer),

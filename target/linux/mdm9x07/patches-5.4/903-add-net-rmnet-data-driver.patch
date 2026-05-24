@@ -1,0 +1,17 @@
+--- a/net/Makefile
++++ b/net/Makefile
+@@ -87,3 +87,4 @@ obj-$(CONFIG_QRTR)		+= qrtr/
+ obj-$(CONFIG_NET_NCSI)		+= ncsi/
+ obj-$(CONFIG_XDP_SOCKETS)	+= xdp/
+ obj-$(CONFIG_IPC_ROUTER)        += ipc_router/
++obj-$(CONFIG_RMNET_DATA)	+= rmnet_data/
+--- a/net/Kconfig
++++ b/net/Kconfig
+@@ -402,6 +402,7 @@ source "net/nfc/Kconfig"
+ source "net/psample/Kconfig"
+ source "net/ife/Kconfig"
+ source "net/ipc_router/Kconfig"
++source "net/rmnet_data/Kconfig"
+ 
+ config LWTUNNEL
+ 	bool "Network light weight tunnels"

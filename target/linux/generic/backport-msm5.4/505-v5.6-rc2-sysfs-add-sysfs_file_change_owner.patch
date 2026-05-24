@@ -1,0 +1,99 @@
+From f70ce185687bbe4e2d7ff126a8c890631f5fc2af Mon Sep 17 00:00:00 2001
+From: Christian Brauner <christian.brauner@ubuntu.com>
+Date: Thu, 27 Feb 2020 04:37:11 +0100
+Subject: [PATCH 500/503] sysfs: add sysfs_file_change_owner()
+
+Add helpers to change the owner of a sysfs files.
+This function will be used to correctly account for kobject ownership
+changes, e.g. when moving network devices between network namespaces.
+
+Reviewed-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Christian Brauner <christian.brauner@ubuntu.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ fs/sysfs/file.c       | 47 +++++++++++++++++++++++++++++++++++++++++++
+ include/linux/sysfs.h | 10 +++++++++
+ 2 files changed, 57 insertions(+)
+
+--- a/fs/sysfs/file.c
++++ b/fs/sysfs/file.c
+@@ -562,6 +562,53 @@ void sysfs_remove_bin_file(struct kobjec
+ }
+ EXPORT_SYMBOL_GPL(sysfs_remove_bin_file);
+ 
++static int internal_change_owner(struct kernfs_node *kn, kuid_t kuid,
++				 kgid_t kgid)
++{
++	struct iattr newattrs = {
++		.ia_valid = ATTR_UID | ATTR_GID,
++		.ia_uid = kuid,
++		.ia_gid = kgid,
++	};
++	return kernfs_setattr(kn, &newattrs);
++}
++
++/**
++ *	sysfs_file_change_owner - change owner of a sysfs file.
++ *	@kobj:	object.
++ *	@name:	name of the file to change.
++ *	@kuid:	new owner's kuid
++ *	@kgid:	new owner's kgid
++ *
++ * This function looks up the sysfs entry @name under @kobj and changes the
++ * ownership to @kuid/@kgid.
++ *
++ * Returns 0 on success or error code on failure.
++ */
++int sysfs_file_change_owner(struct kobject *kobj, const char *name, kuid_t kuid,
++			    kgid_t kgid)
++{
++	struct kernfs_node *kn;
++	int error;
++
++	if (!name)
++		return -EINVAL;
++
++	if (!kobj->state_in_sysfs)
++		return -EINVAL;
++
++	kn = kernfs_find_and_get(kobj->sd, name);
++	if (!kn)
++		return -ENOENT;
++
++	error = internal_change_owner(kn, kuid, kgid);
++
++	kernfs_put(kn);
++
++	return error;
++}
++EXPORT_SYMBOL_GPL(sysfs_file_change_owner);
++
+ /**
+  *	sysfs_emit - scnprintf equivalent, aware of PAGE_SIZE buffer.
+  *	@buf:	start of PAGE_SIZE buffer.
+--- a/include/linux/sysfs.h
++++ b/include/linux/sysfs.h
+@@ -315,6 +315,9 @@ int sysfs_emit(char *buf, const char *fm
+ __printf(3, 4)
+ int sysfs_emit_at(char *buf, int at, const char *fmt, ...);
+ 
++int sysfs_file_change_owner(struct kobject *kobj, const char *name, kuid_t kuid,
++			    kgid_t kgid);
++
+ #else /* CONFIG_SYSFS */
+ 
+ static inline int sysfs_create_dir_ns(struct kobject *kobj, const void *ns)
+@@ -538,6 +541,13 @@ static inline int sysfs_emit_at(char *bu
+ {
+ 	return 0;
+ }
++static inline int sysfs_file_change_owner(struct kobject *kobj,
++					  const char *name, kuid_t kuid,
++					  kgid_t kgid)
++{
++	return 0;
++}
++
+ #endif /* CONFIG_SYSFS */
+ 
+ static inline int __must_check sysfs_create_file(struct kobject *kobj,

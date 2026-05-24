@@ -1,0 +1,20 @@
+--- a/drivers/mtd/mtdpart.c
++++ b/drivers/mtd/mtdpart.c
+@@ -625,7 +625,7 @@ static struct mtd_part *allocate_partiti
+ 	slave->mtd.ecc_strength = parent->ecc_strength;
+ 	slave->mtd.bitflip_threshold = parent->bitflip_threshold;
+ 
+-	if (parent->_block_isbad) {
++	/*if (parent->_block_isbad) {
+ 		uint64_t offs = 0;
+ 
+ 		while (offs < slave->mtd.size) {
+@@ -635,7 +635,7 @@ static struct mtd_part *allocate_partiti
+ 				slave->mtd.ecc_stats.badblocks++;
+ 			offs += slave->mtd.erasesize;
+ 		}
+-	}
++	}*/
+ 
+ out_register:
+ 	return slave;

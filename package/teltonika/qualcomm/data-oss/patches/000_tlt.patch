@@ -1,0 +1,15 @@
+diff --recursive --unified --new-file --no-dereference --exclude .gitver upstream/.gitlab-ci.yml src/.gitlab-ci.yml
+--- upstream/.gitlab-ci.yml	1970-01-01 00:00:00.000000000 +0000
++++ src/.gitlab-ci.yml	2021-11-15 12:08:12.000000000 +0000
+@@ -0,0 +1,11 @@
++stages:
++  - check
++
++code-security-check:
++  stage: check
++  image: ${CI_REGISTRY}/docker/security-checker:latest
++  allow_failure: false
++  script:
++    - bash /app/security-checker/run_codechecker.sh
++  tags:
++    - check

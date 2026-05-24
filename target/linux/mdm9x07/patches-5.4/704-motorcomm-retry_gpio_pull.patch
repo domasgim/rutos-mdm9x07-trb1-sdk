@@ -1,0 +1,76 @@
+--- a/drivers/net/ethernet/qualcomm/emac/emac-phy.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac-phy.c
+@@ -148,7 +148,6 @@ int emac_phy_config(struct platform_devi
+ 
+ 	if (!adpt->phydev) {
+ 		dev_err(&pdev->dev, "could not find external phy\n");
+-		mdiobus_unregister(mii_bus);
+ 		return -ENODEV;
+ 	}
+ 
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -828,6 +828,7 @@ static int emac_probe(struct platform_de
+ 	u16 devid, revid;
+ 	u32 reg;
+ 	int ret;
++	int i;
+ 
+ 	/* The TPD buffer address is limited to:
+ 	 * 1. PTP:	45bits. (Driver doesn't support yet.)
+@@ -893,20 +894,35 @@ static int emac_probe(struct platform_de
+ 		goto err_undo_mdiobus;
+ 	}
+ 
+-	/* Configure MDIO lines */
+-	ret = adpt->gpio_on(adpt, true, true);
+-	if (ret)
+-		goto err_undo_mdiobus;
++	/*
++	 * Seems that Quectel occupies the GPIOS for the MDIO
++	 * Retries allow the system to trigger everything properly
++	 */
++	for (i = 0; i < 5; i++) {
++		/* Configure MDIO lines */
++		ret = adpt->gpio_on(adpt, true, true);
++		if (ret)
++			goto err_undo_mdiobus;
+ 
+ #ifdef CONFIG_MOTORCOMM_PHY_MODULE
+-	/* need to wait 100ms after reset for YT8531 to work */
+-	msleep(100);
++		/* need to wait 100ms after reset for YT8531 to work */
++		msleep(100);
+ #endif
+ 
+-	/* init external phy */
+-	ret = emac_phy_config(pdev, adpt);
+-	if (ret)
++		/* init external phy */
++		ret = emac_phy_config(pdev, adpt);
++		if (!ret)
++			break;
++		else
++			mdiobus_unregister(adpt->mii_bus);
++
++		dev_err(&pdev->dev, "Retrying MDIO line configuration\n");
++	}
++
++	if (ret) {
++		dev_err(&pdev->dev, "Failed to configure MDIO lines\n");
+ 		goto err_undo_mdiobus;
++	}
+ 
+ 	/* set hw features */
+ 	netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_RXCSUM |
+--- a/drivers/net/phy/phy_device.c
++++ b/drivers/net/phy/phy_device.c
+@@ -832,7 +832,7 @@ struct phy_device *get_phy_device(struct
+ 		return ERR_PTR(r);
+ 
+ 	/* If the phy_id is mostly Fs, there is no device there */
+-	if ((phy_id & 0x1fffffff) == 0x1fffffff)
++	if (((phy_id & 0x1fffffff) == 0x1fffffff) || !phy_id)
+ 		return ERR_PTR(-ENODEV);
+ 
+ 	return phy_device_create(bus, addr, phy_id, is_c45, &c45_ids);

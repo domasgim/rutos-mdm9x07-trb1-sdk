@@ -1,0 +1,11 @@
+--- a/arch/arm/kernel/traps.c	2025-10-13 09:40:54.293444413 +0300
++++ b/arch/arm/kernel/traps.c	2025-10-13 09:41:03.549365906 +0300
+@@ -52,7 +52,7 @@
+ void *vectors_page;
+ 
+ #ifdef CONFIG_DEBUG_USER
+-unsigned int user_debug;
++unsigned int user_debug = UDBG_SEGV; // by default log segfaults
+ 
+ static int __init user_debug_setup(char *str)
+ {

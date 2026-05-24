@@ -1,0 +1,24 @@
+--- a/drivers/hwspinlock/Makefile
++++ b/drivers/hwspinlock/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_HWSPINLOCK_SIRF)		+= sirf_h
+ obj-$(CONFIG_HWSPINLOCK_SPRD)		+= sprd_hwspinlock.o
+ obj-$(CONFIG_HWSPINLOCK_STM32)		+= stm32_hwspinlock.o
+ obj-$(CONFIG_HSEM_U8500)		+= u8500_hsem.o
++obj-$(CONFIG_REMOTE_SPINLOCK_MSM)	+= msm_remote_spinlock.o
+--- a/drivers/hwspinlock/Kconfig
++++ b/drivers/hwspinlock/Kconfig
+@@ -68,3 +68,14 @@ config HSEM_U8500
+ 	  SoC.
+ 
+ 	  If unsure, say N.
++
++config REMOTE_SPINLOCK_MSM
++	bool "MSM Remote Spinlock Functionality"
++	depends on HWSPINLOCK
++	depends on ARCH_QCOM
++	help
++	  Say y here to support the MSM Remote Spinlock functionality, which
++	  provides a synchronisation mechanism for the various processor on the
++	  SoC.
++
++	  If unsure, say N.

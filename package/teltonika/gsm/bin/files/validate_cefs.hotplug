@@ -1,0 +1,21 @@
+#!/bin/sh
+
+[ "$EVENT_NAME" = "gsm.new_modem" ] || exit 0
+
+lock -n /var/lock/LCK_cefs_validated.lock
+
+imei=$(gsmctl -O "$MODEM_ID" -i)
+[ "${imei:0:5}" = "ERROR" ] || {
+	lock -u /var/lock/LCK_cefs_validated.lock
+	exit 1
+}
+
+func_id="$(jsonfilter -s "$(ubus call gsm.modem0 get_func)" -e '@.func_id')"
+
+[ "$func_id" -eq 4 ] && {
+	logger "CEFS partition is corrupted... Rebooting device and restoring the partition"
+	lock -u /var/lock/LCK_cefs_validated.lock
+	reboot
+	exit 1
+}
+lock -u /var/lock/LCK_cefs_validated.lock

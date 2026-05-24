@@ -1,0 +1,38 @@
+diff --git a/target/mdm9607/keypad.c b/target/mdm9607/keypad.c
+index a57a2f8..c1c667d 100755
+--- a/target/mdm9607/keypad.c
++++ b/target/mdm9607/keypad.c
+@@ -33,7 +33,7 @@
+ /* GPIO that controls the button
+  * for FASTBOOT.
+  */
+-#define FASTBOOT_KEY_GPIO_ID        37
++#define FASTBOOT_KEY_GPIO_ID        34
+ 
+ /*
+  * Returns fastboot button state.
+@@ -43,9 +43,10 @@ int get_fastboot_key_state(void)
+ {
+ 	int ret;
+ 
+-	gpio_tlmm_config(FASTBOOT_KEY_GPIO_ID, 0, GPIO_INPUT, GPIO_PULL_DOWN, GPIO_2MA, GPIO_ENABLE);
++	gpio_tlmm_config(FASTBOOT_KEY_GPIO_ID, 0, GPIO_INPUT, GPIO_PULL_UP, GPIO_2MA, GPIO_ENABLE);
+ 
+-	ret = gpio_get_state(FASTBOOT_KEY_GPIO_ID);
++	// inverted logic
++	ret = !gpio_get_state(FASTBOOT_KEY_GPIO_ID);
+ 
+ 	return ret;
+ }
+diff --git a/target/mdm9607/rules.mk b/target/mdm9607/rules.mk
+index 2a5340b..eeeb98c 100755
+--- a/target/mdm9607/rules.mk
++++ b/target/mdm9607/rules.mk
+@@ -23,6 +23,7 @@ SCRATCH_REGION_SIZE_256                 := 0x08000000  # 128MB
+ 
+ BASE_ADDR                               := 0x80000000
+ 
++DEFINES += NO_KEYPAD_DRIVER=1
+ 
+ MODULES += \
+ 	dev/keys \

@@ -1,0 +1,27 @@
+--- a/arch/arm/include/asm/io.h
++++ b/arch/arm/include/asm/io.h
+@@ -116,6 +116,15 @@ static inline u32 __raw_readl(const vola
+ 	return val;
+ }
+ 
++#define __raw_readq __raw_readq
++static inline u64 __raw_readq(const volatile void __iomem *addr)             
++{
++        u64 val;
++	asm volatile("ldrd %Q1, %R1, %0"
++		     : "+Q" (*(volatile u64 __force *)addr), "=r" (val));
++        return val;
++}
++
+ /*
+  * Architecture ioremap implementation.
+  */
+@@ -293,6 +302,8 @@ extern void _memset_io(volatile void __i
+ 					__raw_readw(c)); __r; })
+ #define readl_relaxed(c) ({ u32 __r = le32_to_cpu((__force __le32) \
+ 					__raw_readl(c)); __r; })
++#define readq_relaxed(c) ({ u64 __r = le64_to_cpu((__force __le64) \
++					__raw_readq(c)); __r; })
+ 
+ #define writeb_relaxed(v,c)	__raw_writeb(v,c)
+ #define writew_relaxed(v,c)	__raw_writew((__force u16) cpu_to_le16(v),c)

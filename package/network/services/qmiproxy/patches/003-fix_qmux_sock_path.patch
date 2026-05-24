@@ -1,0 +1,22 @@
+Index: qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+===================================================================
+--- qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26.orig/qmiserial2qmuxd.c
++++ qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+@@ -277,7 +277,7 @@ err_t read_msg(int fd, bool_t expect_fra
+ 	return 0;
+ }
+ 
+-#define SOCKPATH "/dev/socket/qmux_radio/" // TODO make configurable?
++#define SOCKPATH "/var/"
+ 
+ err_t open_qmuxd_socket() {
+ 	int ret;
+@@ -289,7 +289,7 @@ err_t open_qmuxd_socket() {
+ 
+ 	// Following the Gobi API. I don't know the significance of the client name, but qmuxd won't connect if it can't stat() the path
+ 	struct sockaddr_un sockaddr = { .sun_family = AF_UNIX };
+-	snprintf(sockaddr.sun_path, sizeof(sockaddr.sun_path), "%sqmux_client_socket%7lu", SOCKPATH, (unsigned long)getpid());
++	snprintf(sockaddr.sun_path, sizeof(sockaddr.sun_path), "%sqmux_client_socket", SOCKPATH);
+ 	unlink(sockaddr.sun_path);
+ 	ret = bind(sockfd, (const struct sockaddr*)&sockaddr, sizeof(sockaddr));
+ 	if (ret < 0) goto close_and_return_errno;

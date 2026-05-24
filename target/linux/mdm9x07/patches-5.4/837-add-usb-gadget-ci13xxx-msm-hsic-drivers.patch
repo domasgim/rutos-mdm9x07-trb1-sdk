@@ -1,0 +1,125 @@
+--- a/drivers/usb/gadget/Makefile
++++ b/drivers/usb/gadget/Makefile
+@@ -11,3 +11,6 @@ libcomposite-y			:= usbstring.o config.o
+ libcomposite-y			+= composite.o functions.o configfs.o u_f.o
+ 
+ obj-$(CONFIG_USB_GADGET)	+= udc/ function/ legacy/
++
++obj-$(CONFIG_USB_CI13XXX_MSM)   += ci13xxx_msm.o
++obj-$(CONFIG_USB_CI13XXX_MSM_HSIC)     += ci13xxx_msm_hsic.o
+--- a/drivers/usb/gadget/udc/Kconfig
++++ b/drivers/usb/gadget/udc/Kconfig
+@@ -442,6 +442,33 @@ config USB_GADGET_XILINX
+ 	  dynamically linked module called "udc-xilinx" and force all
+ 	  gadget drivers to also be dynamically linked.
+ 
++config USB_CI13XXX_MSM
++        tristate "MIPS USB CI13xxx for MSM"
++        select USB_MSM_OTG
++        help
++          MSM SoC has chipidea USB controller.  This driver uses
++          ci13xxx_udc core.
++          This driver depends on OTG driver for PHY initialization,
++          clock management, powering up VBUS, and power management.
++          This driver is not supported on boards like trout which
++          has an external PHY.
++
++          Say "y" to link the driver statically, or "m" to build a
++          dynamically linked module called "ci13xxx_msm" and force all
++          gadget drivers to also be dynamically linked
++
++config USB_CI13XXX_MSM_HSIC
++        tristate "MIPS HSIC CI13xxx for MSM"
++        depends on ARCH_QCOM
++        select USB_GADGET_DUALSPEED
++        help
++        MSM SoC has chipidea USB controller.  This driver uses
++        ci13xxx_udc core. Support USB-HSIC core.
++
++        Say "y" to link the driver statically, or "m" to build a
++        dynamically linked module called "ci13xxx_msm_hsic" and force all
++        gadget drivers to also be dynamically linked.
++
+ source "drivers/usb/gadget/udc/aspeed-vhub/Kconfig"
+ 
+ #
+--- a/include/linux/usb/gadget.h
++++ b/include/linux/usb/gadget.h
+@@ -28,6 +28,18 @@
+ 
+ #define UDC_TRACE_STR_MAX	512
+ 
++/*
++ * The following are bit fields describing the usb_request.udc_priv word.  
++ * These bit fields are set by function drivers that wish to queue
++ * usb_requests with sps/bam parameters.
++ */
++#define MSM_PIPE_ID_MASK                (0x1F)
++#define MSM_TX_PIPE_ID_OFS              (16)
++#define MSM_SPS_MODE                    BIT(5)
++#define MSM_IS_FINITE_TRANSFER          BIT(6)
++#define MSM_ETD_IOC                     BIT(9)
++#define MSM_VENDOR_ID                   BIT(16)
++
+ struct usb_ep;
+ 
+ /**
+@@ -75,6 +87,7 @@ struct usb_ep;
+  *	Note that for writes (IN transfers) some data bytes may still
+  *	reside in a device-side FIFO when the request is reported as
+  *	complete.
++ * @udc_priv: Vendor private data in usage by the UDC.
+  *
+  * These are allocated/freed through the endpoint they're used with.  The
+  * hardware's driver can add extra per-request data to the memory it returns,
+@@ -118,6 +131,7 @@ struct usb_request {
+ 
+ 	int			status;
+ 	unsigned		actual;
++	unsigned int            udc_priv;
+ };
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -213,6 +227,8 @@ struct usb_ep_caps {
+  *	enabled and remains valid until the endpoint is disabled.
+  * @comp_desc: In case of SuperSpeed support, this is the endpoint companion
+  *	descriptor that is used to configure the endpoint
++ * @endless: In case where endless transfer is being initiated, this is set
++ *      to disable usb event interrupt for few events.
+  *
+  * the bus controller driver lists all the general purpose endpoints in
+  * gadget->ep_list.  the control endpoint (gadget->ep0) is not in that list,
+@@ -236,6 +252,7 @@ struct usb_ep {
+ 	u8			address;
+ 	const struct usb_endpoint_descriptor	*desc;
+ 	const struct usb_ss_ep_comp_descriptor	*comp_desc;
++	bool                    endless;
+ };
+ 
+ /*-------------------------------------------------------------------------*/
+@@ -428,6 +445,14 @@ struct usb_gadget {
+ 	unsigned			deactivated:1;
+ 	unsigned			connected:1;
+ 	unsigned			lpm_capable:1;
++	unsigned                        remote_wakeup:1;
++	u32                             xfer_isr_count;
++	u8                              usb_core_id;
++	bool                            bam2bam_func_enabled;
++	u32                             extra_buf_alloc;
++	bool                            l1_supported;
++	bool                            is_chipidea;
++	int                             interrupt_num;
+ 	int				irq;
+ };
+ #define work_to_gadget(w)	(container_of((w), struct usb_gadget, work))
+--- a/include/linux/dma-mapping.h
++++ b/include/linux/dma-mapping.h
+@@ -82,6 +82,8 @@
+  */
+ #define DMA_ATTR_SKIP_ZEROING           (1UL << 10)
+ 
++#define DMA_ERROR_CODE       (~(dma_addr_t)0)
++
+ /*
+  * A dma_addr_t can hold any valid DMA or bus address for the platform.
+  * It can be given to a device to use as a DMA source or target.  A CPU cannot

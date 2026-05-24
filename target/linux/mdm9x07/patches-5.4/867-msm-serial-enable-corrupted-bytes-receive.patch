@@ -1,0 +1,116 @@
+--- a/drivers/tty/serial/msm_serial_hs.c
++++ b/drivers/tty/serial/msm_serial_hs.c
+@@ -230,6 +230,7 @@ struct msm_hs_port {
+ 	struct msm_hs_wakeup wakeup;
+ 
+ 	struct dentry *loopback_dir;
++	struct dentry *filter_dir;
+ 	struct work_struct clock_off_w; /* work for actual clock off */
+ 	struct workqueue_struct *hsuart_wq; /* hsuart workqueue */
+ 	struct mutex mtx; /* resource access mutex */
+@@ -717,14 +718,79 @@ static int msm_serial_loopback_enable_ge
+ 
+ 	return 0;
+ }
++
++static int msm_serial_filter_enable_set(void *data, u64 val)
++{
++	struct msm_hs_port *msm_uport = data;
++	struct uart_port *uport = &(msm_uport->uport);
++	unsigned long flags;
++	int ret = 0;
++
++	msm_hs_resource_vote(msm_uport);
++
++	if (val) {
++		spin_lock_irqsave(&uport->lock, flags);
++		ret = msm_hs_read(uport, UART_DM_MR2);
++		/*
++	 	* Set RX_BREAK_ZERO_CHAR_OFF and RX_ERROR_CHAR_OFF
++	 	* so any rx_break and character having parity of framing
++	 	* error don't enter inside UART RX FIFO.
++	 	*/
++		ret |= (UARTDM_MR2_RX_BREAK_ZERO_CHAR_OFF |
++			UARTDM_MR2_RX_ERROR_CHAR_OFF);
++		msm_hs_write(uport, UART_DM_MR2, ret);
++		spin_unlock_irqrestore(&uport->lock, flags);
++	} else {
++		spin_lock_irqsave(&uport->lock, flags);
++		ret = msm_hs_read(uport, UART_DM_MR2);
++		ret &= ~(UARTDM_MR2_RX_BREAK_ZERO_CHAR_OFF |
++			UARTDM_MR2_RX_ERROR_CHAR_OFF);
++		msm_hs_write(uport, UART_DM_MR2, ret);
++		spin_unlock_irqrestore(&uport->lock, flags);
++	}
++	/* Calling CLOCK API. Hence mb() requires here. */
++	mb();
++
++	msm_hs_resource_unvote(msm_uport);
++	return 0;
++}
++
++static int msm_serial_filter_enable_get(void *data, u64 *val)
++{
++	struct msm_hs_port *msm_uport = data;
++	struct uart_port *uport = &(msm_uport->uport);
++	unsigned long flags;
++	int ret = 0;
++
++	msm_hs_resource_vote(msm_uport);
++
++	spin_lock_irqsave(&uport->lock, flags);
++	ret = msm_hs_read(&msm_uport->uport, UART_DM_MR2);
++	spin_unlock_irqrestore(&uport->lock, flags);
++
++	msm_hs_resource_unvote(msm_uport);
++
++	*val = (ret & UARTDM_MR2_RX_ERROR_CHAR_OFF) ? 1 : 0;
++
++	return 0;
++}
+ DEFINE_SIMPLE_ATTRIBUTE(loopback_enable_fops, msm_serial_loopback_enable_get,
+ 			msm_serial_loopback_enable_set, "%llu\n");
+ 
++DEFINE_SIMPLE_ATTRIBUTE(filter_enable_fops, msm_serial_filter_enable_get,
++			msm_serial_filter_enable_set, "%llu\n");			
++
+ /*
+  * msm_serial_hs debugfs node: <debugfs_root>/msm_serial_hs/loopback.<id>
+  * writing 1 turns on internal loopback mode in HW. Useful for automation
+  * test scripts.
+  * writing 0 disables the internal loopback mode. Default is disabled.
++ *
++ * msm_serial_hs debugfs node: <debugfs_root>/msm_serial_hs/filter.<id>
++ * writing 1 sets to any rx_break and character having parity of framing
++ * error don't enter inside UART RX FIFO
++ * writing 0 disables the filtering of invalid characters.
++ * Default is enabled.
+  */
+ static void msm_serial_debugfs_init(struct msm_hs_port *msm_uport,
+ 					   int id)
+@@ -741,6 +807,17 @@ static void msm_serial_debugfs_init(stru
+ 	if (IS_ERR_OR_NULL(msm_uport->loopback_dir))
+ 		MSM_HS_ERR("%s(): Cannot create loopback.%d debug entry\n",
+ 							__func__, id);
++
++	snprintf(node_name, sizeof(node_name), "filter.%d", id);
++	msm_uport->filter_dir = debugfs_create_file(node_name,
++						0644,
++						debug_base,
++						msm_uport,
++						&filter_enable_fops);
++
++	if (IS_ERR_OR_NULL(msm_uport->filter_dir))
++		MSM_HS_ERR("%s(): Cannot create filter.%d debug entry\n",
++							__func__, id);							
+ }
+ 
+ static int msm_hs_remove(struct platform_device *pdev)
+@@ -762,6 +839,7 @@ static int msm_hs_remove(struct platform
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_clock.attr);
+ 	sysfs_remove_file(&pdev->dev.kobj, &dev_attr_debug_mask.attr);
+ 	debugfs_remove(msm_uport->loopback_dir);
++	debugfs_remove(msm_uport->filter_dir);
+ 
+ 	dma_free_coherent(msm_uport->uport.dev,
+ 			UART_DMA_DESC_NR * UARTDM_RX_BUF_SIZE,

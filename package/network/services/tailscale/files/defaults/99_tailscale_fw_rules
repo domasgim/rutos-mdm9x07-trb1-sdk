@@ -1,0 +1,26 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+[ "$(uci_get tailscale settings enabled)" = "1" ] || exit 0
+
+check_zone() {
+    local name
+    config_get name "$1" "name" ""
+    [ "$name" = "tailscale" ] && exit 0
+}
+
+add_zone() {
+    uci_add firewall zone
+    uci_set firewall "$CONFIG_SECTION" "device" "tailscale0"
+    uci_set firewall "$CONFIG_SECTION" "name" "tailscale"
+    uci_set firewall "$CONFIG_SECTION" "input" "ACCEPT"
+    uci_set firewall "$CONFIG_SECTION" "forward" "REJECT"
+    uci_set firewall "$CONFIG_SECTION" "output" "ACCEPT"
+    uci_set firewall "$CONFIG_SECTION" "masq" "1"
+    uci_commit firewall
+}
+
+config_load "firewall"
+config_foreach check_zone "zone"
+add_zone

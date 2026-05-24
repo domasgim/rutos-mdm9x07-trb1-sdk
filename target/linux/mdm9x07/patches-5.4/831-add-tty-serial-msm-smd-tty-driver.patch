@@ -1,0 +1,27 @@
+--- a/drivers/tty/serial/Makefile
++++ b/drivers/tty/serial/Makefile
+@@ -66,6 +66,7 @@ obj-$(CONFIG_SERIAL_ALTERA_JTAGUART) +=
+ obj-$(CONFIG_SERIAL_VT8500) += vt8500_serial.o
+ obj-$(CONFIG_SERIAL_IFX6X60)  	+= ifx6x60.o
+ obj-$(CONFIG_SERIAL_PCH_UART)	+= pch_uart.o
++obj-$(CONFIG_SERIAL_MSM_SMD)    += msm_smd_tty.o
+ obj-$(CONFIG_SERIAL_MXS_AUART) += mxs-auart.o
+ obj-$(CONFIG_SERIAL_LANTIQ)	+= lantiq.o
+ obj-$(CONFIG_SERIAL_XILINX_PS_UART) += xilinx_uartps.o
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1245,6 +1245,14 @@ config SERIAL_PCH_UART_CONSOLE
+ 	  (the system  console is the device which receives all kernel messages and
+ 	  warnings and which allows logins in single user mode).
+ 
++config SERIAL_MSM_SMD
++        bool "Enable tty device interface for some SMD ports"
++        default n
++        depends on MSM_SMD
++        help
++          Enables userspace clients to read and write to some streaming SMD
++          ports via tty device interface for MSM chipset.
++
+ config SERIAL_MXS_AUART
+ 	tristate "MXS AUART support"
+ 	depends on ARCH_MXS || MACH_ASM9260 || COMPILE_TEST

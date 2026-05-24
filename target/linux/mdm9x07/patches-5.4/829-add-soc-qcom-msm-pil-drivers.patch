@@ -1,0 +1,48 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -32,5 +32,8 @@ obj-$(CONFIG_MSM_BAM_DMUX) += bam_dmux.o
+ obj-$(CONFIG_MSM_IPC_ROUTER_SMD_XPRT) += ipc_router_smd_xprt.o
+ obj-$(CONFIG_CPU_V7) += idle-v7.o
+ obj-$(CONFIG_QCOM_SCM) += scm.o scm-boot.o
++obj-$(CONFIG_MSM_PIL) += peripheral-loader.o
++obj-$(CONFIG_MSM_PIL_MSS_QDSP6V5) += pil-q6v5.o pil-msa.o pil-q6v5-mss.o
++obj-$(CONFIG_MSM_PIL_SSR_GENERIC) += subsys-pil-tz.o
+ 
+ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -259,4 +259,34 @@ config MSM_IPC_ROUTER_SMD_XPRT
+           this layer registers a transport with IPC Router and enable
+           message exchange.
+ 
++config MSM_PIL
++       bool "Peripheral image loading"
++       select FW_LOADER
++       default n
++       help
++         Some peripherals need to be loaded into memory before they can be
++         brought out of reset.
++
++         Say yes to support these devices.
++
++config MSM_PIL_SSR_GENERIC
++       tristate "MSM Subsystem Boot Support"
++       depends on MSM_PIL && MSM_SUBSYSTEM_RESTART
++       help
++         Support for booting and shutting down MSM Subsystem processors.
++         This driver also monitors the SMSM status bits and the watchdog
++         interrupt for the subsystem and restarts it on a watchdog bite
++         or a fatal error. Subsystems include LPASS, Venus, VPU, WCNSS and
++         BCSS.
++
++config MSM_PIL_MSS_QDSP6V5
++       tristate "MSS QDSP6v5 (Hexagon) Boot Support"
++       depends on MSM_PIL && MSM_SUBSYSTEM_RESTART
++       help
++         Support for booting and shutting down QDSP6v5 (Hexagon) processors
++         in modem subsystems. If you would like to make or receive phone
++         calls then say Y here.
++
++         If unsure, say N.
++
+ endmenu

@@ -1,0 +1,26 @@
+--- a/drivers/net/ethernet/qualcomm/emac/emac.c
++++ b/drivers/net/ethernet/qualcomm/emac/emac.c
+@@ -881,11 +881,6 @@ static int emac_probe(struct platform_de
+ 
+ 	emac_init_adapter(adpt);
+ 
+-	/* init external phy */
+-	ret = emac_phy_config(pdev, adpt);
+-	if (ret)
+-		goto err_undo_clocks;
+-
+ 	/* init internal sgmii phy */
+ 	ret = emac_sgmii_config(pdev, adpt);
+ 	if (ret)
+@@ -903,6 +898,11 @@ static int emac_probe(struct platform_de
+ 	if (ret)
+ 		goto err_undo_mdiobus;
+ 
++	/* init external phy */
++	ret = emac_phy_config(pdev, adpt);
++	if (ret)
++		goto err_undo_mdiobus;
++
+ 	/* set hw features */
+ 	netdev->features = NETIF_F_SG | NETIF_F_HW_CSUM | NETIF_F_RXCSUM |
+ 			NETIF_F_TSO | NETIF_F_TSO6 | NETIF_F_HW_VLAN_CTAG_RX |

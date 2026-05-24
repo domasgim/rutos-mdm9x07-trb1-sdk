@@ -1,0 +1,28 @@
+--- a/drivers/char/Makefile
++++ b/drivers/char/Makefile
+@@ -12,6 +12,7 @@ obj-$(CONFIG_RAW_DRIVER)	+= raw.o
+ obj-$(CONFIG_MSPEC)		+= mspec.o
+ obj-$(CONFIG_UV_MMTIMER)	+= uv_mmtimer.o
+ obj-$(CONFIG_IBM_BSR)		+= bsr.o
++obj-$(CONFIG_MSM_SMD_PKT)       += msm_smd_pkt.o
+ 
+ obj-$(CONFIG_PRINTER)		+= lp.o
+ 
+--- a/drivers/char/Kconfig
++++ b/drivers/char/Kconfig
+@@ -521,6 +521,15 @@ config DEVPORT
+ 
+ source "drivers/s390/char/Kconfig"
+ 
++config MSM_SMD_PKT
++	bool "Enable device interface for some SMD packet ports"
++	default n
++	help
++	 smd_pkt driver provides the interface for the userspace clients
++	 to communicate over smd via device nodes. This enable the
++	 usersapce clients to read and write to some smd packets channel
++	 for MSM chipset.
++
+ source "drivers/char/xillybus/Kconfig"
+ 
+ config ADI

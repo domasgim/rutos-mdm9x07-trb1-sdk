@@ -1,0 +1,2 @@
+/etc/config/mbus_client mbus_client:mbus_client 660
+/usr/local/share/mbus_client mbus_client:mbus_client 755 cd

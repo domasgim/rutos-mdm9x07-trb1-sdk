@@ -1,0 +1,197 @@
+nand id set from 3.18
+the set we got with 5.4 is missing IDs for ECxx-AU, EC21-J, EC20-CE.
+those TRB1 get bricked after update.
+  
+--- a/drivers/mtd/nand/raw/internals.h
++++ b/drivers/mtd/nand/raw/internals.h
+@@ -16,22 +16,25 @@
+ /*
+  * NAND Flash Manufacturer ID Codes
+  */
+-#define NAND_MFR_AMD		0x01
+-#define NAND_MFR_ATO		0x9b
+-#define NAND_MFR_EON		0x92
+-#define NAND_MFR_ESMT		0xc8
++#define NAND_MFR_TOSHIBA	0x98
++#define NAND_MFR_SAMSUNG	0xec
+ #define NAND_MFR_FUJITSU	0x04
+-#define NAND_MFR_HYNIX		0xad
+-#define NAND_MFR_INTEL		0x89
+-#define NAND_MFR_MACRONIX	0xc2
+-#define NAND_MFR_MICRON		0x2c
+ #define NAND_MFR_NATIONAL	0x8f
+ #define NAND_MFR_RENESAS	0x07
+-#define NAND_MFR_SAMSUNG	0xec
+-#define NAND_MFR_SANDISK	0x45
+ #define NAND_MFR_STMICRO	0x20
+-#define NAND_MFR_TOSHIBA	0x98
+-#define NAND_MFR_WINBOND	0xef
++#define NAND_MFR_HYNIX		0xad
++#define NAND_MFR_MICRON		0x2c
++#define NAND_MFR_AMD		0x01
++#define NAND_MFR_MACRONIX	0xc2
++#define NAND_MFR_EON		0x92
++#define NAND_MFR_SANDISK	0x45
++#define NAND_MFR_INTEL		0x89
++#if 1 //quectel add  def QUECTEL_NAND_JSFCBB3YH3BBG
++#define NAND_MFR_JSC 		0xAD
++//for 2+2 flash
++//len 20180418
++#define NAND_MFR_NANYA 		0x98
++#endif
+ 
+ /**
+  * struct nand_manufacturer_ops - NAND Manufacturer operations
+--- a/drivers/mtd/nand/raw/nand_ids.c
++++ b/drivers/mtd/nand/raw/nand_ids.c
+@@ -7,7 +7,7 @@
+ 
+ #include "internals.h"
+ 
+-#define LP_OPTIONS 0
++#define LP_OPTIONS NAND_SAMSUNG_LP_OPTIONS
+ #define LP_OPTIONS16 (LP_OPTIONS | NAND_BUSWIDTH_16)
+ 
+ #define SP_OPTIONS NAND_NEED_READRDY
+@@ -26,16 +26,27 @@ struct nand_flash_dev nand_flash_ids[] =
+ 	 * listed by full ID. We list them first so that we can easily identify
+ 	 * the most specific match.
+ 	 */
+-	{"TC58NVG0S3E 1G 3.3V 8-bit",
+-		{ .id = {0x98, 0xd1, 0x90, 0x15, 0x76, 0x14, 0x01, 0x00} },
+-		  SZ_2K, SZ_128, SZ_128K, 0, 8, 64, NAND_ECC_INFO(1, SZ_512),
+-		  2 },
++	{"TC58NYG1S3H 2G 1.8V 8-bit",
++		{ .id = {0x98, 0xaa, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++		  SZ_2K, SZ_256, SZ_128K, 0, 4, 128, NAND_ECC_INFO(8, SZ_512)},
++#if 1 //QUECTEL_NAND_MT29AZ5A3CHHWD  quectel define þ 4G flash
++	{"MT29F4G08ABBDAHC 4G 3.3V 8-bit",
++		{ .id = {0x2c, 0xac, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++		  SZ_2K, SZ_512, SZ_128K, 0, 4, 64, NAND_ECC_INFO(4, SZ_512)},
++#else
++    {"MT29F4G08ABBDAHC 4G 3.3V 8-bit",
++        { .id = {0x2c, 0xac, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++          SZ_2K, SZ_512, SZ_128K, 0, 4, 64, NAND_ECC_INFO(4, SZ_512)},
++#endif
++	{"MT29RZ4B2DZZHGSK 4G 3.3V 8-bit",
++		{ .id = {0x2c, 0xac, 0x90, 0x26, 0x00, 0x00, 0x00, 0x00} },
++		  SZ_4K, SZ_512, SZ_256K, 0, 4, 224, NAND_ECC_INFO(8, SZ_512)},
+ 	{"TC58NVG2S0F 4G 3.3V 8-bit",
+ 		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x15, 0x01, 0x08} },
+ 		  SZ_4K, SZ_512, SZ_256K, 0, 8, 224, NAND_ECC_INFO(4, SZ_512) },
+-	{"TC58NVG2S0H 4G 3.3V 8-bit",
+-		{ .id = {0x98, 0xdc, 0x90, 0x26, 0x76, 0x16, 0x08, 0x00} },
+-		  SZ_4K, SZ_512, SZ_256K, 0, 8, 256, NAND_ECC_INFO(8, SZ_512) },
++	{"MT29F8G08ABBCAH4 8G 3.3V 8-bit",
++		{ .id = {0x2c, 0xa3, 0x90, 0x26, 0x00, 0x00, 0x00, 0x00} },
++		SZ_4K, SZ_1K, SZ_256K, 0, 4, 224, NAND_ECC_INFO(8, SZ_512)},
+ 	{"TC58NVG3S0F 8G 3.3V 8-bit",
+ 		{ .id = {0x98, 0xd3, 0x90, 0x26, 0x76, 0x15, 0x02, 0x08} },
+ 		  SZ_4K, SZ_1K, SZ_256K, 0, 8, 232, NAND_ECC_INFO(4, SZ_512) },
+@@ -50,33 +61,46 @@ struct nand_flash_dev nand_flash_ids[] =
+ 		  SZ_16K, SZ_8K, SZ_4M, 0, 6, 1280, NAND_ECC_INFO(40, SZ_1K) },
+ 	{"H27UCG8T2ATR-BC 64G 3.3V 8-bit",
+ 		{ .id = {0xad, 0xde, 0x94, 0xda, 0x74, 0xc4} },
+-		  SZ_8K, SZ_8K, SZ_2M, NAND_NEED_SCRAMBLING, 6, 640,
+-		  NAND_ECC_INFO(40, SZ_1K), 4 },
+-
+-	{"JSFCBB3YH3BBG 4G 1.8V 4-bit",
+-                { .id = {0xad, 0xac, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
+-                  SZ_2K, SZ_512, SZ_128K, 0, 4, 128,
+-		  NAND_ECC_INFO(4, SZ_512) },
+-
+-	{"MT29F4G08ABBDAHC 4G 3.3V 8-bit",
+-		{ .id = {0x2c, 0xac, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
+-		  SZ_2K, SZ_512, SZ_128K, 0, 4, 64,
+-		  NAND_ECC_INFO(4, SZ_512) },
+-
++		  SZ_8K, SZ_8K, SZ_2M, 0, 6, 640, NAND_ECC_INFO(40, SZ_1K),
++		  4 },
++	{"KSLCMBL2VA2M2A 2G 1.8V 8-bit",
++		{ .id = {0x98, 0xac, 0x90, 0x26, 0x76, 0x00, 0x00, 0x00} },
++		SZ_4K, SZ_512, SZ_256K, 0, 5, 256, NAND_ECC_INFO(8, SZ_512) },
++
++	{"MT29RZ2B1DZZHGSP 2G  1.8V 4-bit",
++		{ .id = {0x2c, 0xaa, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++		SZ_2K, SZ_256, SZ_128K, 0, 4, 64, NAND_ECC_INFO(4, SZ_512) },
++
++	{"KSLCMAL2TA0M2A 2G 1.8V 8-bit",
++		{ .id = {0x98, 0xaa, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++		SZ_2K, SZ_256, SZ_128K, 0, 4, 128, NAND_ECC_INFO(8, SZ_512)},
++#if 1 //quectel define jsfc 4G flash
+ 	{"JSFCBB3Y7ABBD_2G 1.8V 8-bit",
+ 		{ .id = {0x01, 0xaC, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
+-		  SZ_2K, SZ_512, SZ_128K, 0, 4, 128,
+-		  NAND_ECC_INFO(8, SZ_512) },
++		SZ_2K, SZ_512, SZ_128K, 0, 4, 128, NAND_ECC_INFO(8, SZ_512)},
++#endif
+ 
+-	{"JSFBB3YH3BBG 2G 1.8V 4-bit",
++//add by len 20180413
++//for 2+2 flash configration (JSFBBx3YH3BBG)
++#if 1
++    {"JSFBB3YH3BBG 2G 1.8V 4-bit",
+ 		{ .id = {0xad, 0xaa, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
+-		  SZ_2K, SZ_256, SZ_128K, 0, 4, 128,
+-		  NAND_ECC_INFO(4, SZ_512) },
++		SZ_2K, SZ_256, SZ_128K, 0, 4, 128, NAND_ECC_INFO(4, SZ_512)},
++#endif
+ 
+-	{"NM1282KSLAXAL 2G 1.8V 4-bit",
++//for 2+2 flash configration (NM1282KSLAXAL)
++#if 1
++    {"NM1282KSLAXAL 2G 1.8V 4-bit",
++		{ .id = {0x98, 0xaa, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
++		SZ_2K, SZ_256, SZ_128K, 0, 4, 128, NAND_ECC_INFO(4, SZ_512)},
++#endif
++//add end
++
++#if 1 //quectel add  def QUECTEL_NAND_JSFCBB3YH3BBG
++    {"JSFCBB3YH3BBG 4G 1.8V 4-bit",
+ 		{ .id = {0xad, 0xac, 0x90, 0x15, 0x00, 0x00, 0x00, 0x00} },
+-		  SZ_2K, SZ_512, SZ_128K, 0, 4, 128,
+-		  NAND_ECC_INFO(4, SZ_512) },
++		SZ_2K, SZ_512, SZ_128K, 0, 4, 128, NAND_ECC_INFO(4, SZ_512)},
++#endif
+ 
+ 	LEGACY_ID_NAND("NAND 4MiB 5V 8-bit",   0x6B, 4, SZ_8K, SP_OPTIONS),
+ 	LEGACY_ID_NAND("NAND 4MiB 3,3V 8-bit", 0xE3, 4, SZ_8K, SP_OPTIONS),
+@@ -192,22 +216,26 @@ struct nand_flash_dev nand_flash_ids[] =
+ 
+ /* Manufacturer IDs */
+ static const struct nand_manufacturer nand_manufacturers[] = {
+-	{NAND_MFR_AMD, "AMD/Spansion", &amd_nand_manuf_ops},
+-	{NAND_MFR_ATO, "ATO"},
+-	{NAND_MFR_EON, "Eon"},
+-	{NAND_MFR_ESMT, "ESMT", &esmt_nand_manuf_ops},
++	{NAND_MFR_TOSHIBA, "Toshiba"},
++	{NAND_MFR_SAMSUNG, "Samsung"},
+ 	{NAND_MFR_FUJITSU, "Fujitsu"},
+-	{NAND_MFR_HYNIX, "Hynix", &hynix_nand_manuf_ops},
+-	{NAND_MFR_INTEL, "Intel"},
+-	{NAND_MFR_MACRONIX, "Macronix", &macronix_nand_manuf_ops},
+-	{NAND_MFR_MICRON, "Micron", &micron_nand_manuf_ops},
+ 	{NAND_MFR_NATIONAL, "National"},
+ 	{NAND_MFR_RENESAS, "Renesas"},
+-	{NAND_MFR_SAMSUNG, "Samsung", &samsung_nand_manuf_ops},
+-	{NAND_MFR_SANDISK, "SanDisk"},
+ 	{NAND_MFR_STMICRO, "ST Micro"},
+-	{NAND_MFR_TOSHIBA, "Toshiba", &toshiba_nand_manuf_ops},
+-	{NAND_MFR_WINBOND, "Winbond"},
++	{NAND_MFR_HYNIX, "Hynix"},
++	{NAND_MFR_MICRON, "Micron"},
++	{NAND_MFR_AMD, "AMD/Spansion"},
++	{NAND_MFR_MACRONIX, "Macronix"},
++	{NAND_MFR_EON, "Eon"},
++	{NAND_MFR_SANDISK, "SanDisk"},
++	{NAND_MFR_INTEL, "Intel"},
++#if 1 //quectel add  def QUECTEL_NAND_JSFCBB3YH3BBG
++	{NAND_MFR_JSC,   "Jsc"},
++//add for 2+2 NANYA flash
++//len 20180417
++	{NAND_MFR_NANYA, "Nanya"},
++#endif
++	{0x0, "Unknown"}
+ };
+ 
+ /**

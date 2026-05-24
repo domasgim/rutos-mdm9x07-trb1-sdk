@@ -1,0 +1,92 @@
+--- a/drivers/power/reset/msm-poweroff.c
++++ b/drivers/power/reset/msm-poweroff.c
+@@ -13,6 +13,15 @@
+ #include <linux/reboot.h>
+ #include <linux/pm.h>
+ 
++#include <asm/system_misc.h>
++
++#include <soc/qcom/scm.h>
++
++#define SCM_IO_DISABLE_PMIC_ARBITER 	0x01
++#define SCM_WDOG_DEBUG_BOOT_PART 	0x09
++
++static bool scm_pmic_arbiter_disable_supported;
++
+ static void __iomem *msm_ps_hold;
+ static int deassert_pshold(struct notifier_block *nb, unsigned long action,
+ 			   void *data)
+@@ -28,11 +37,62 @@ static struct notifier_block restart_nb
+ 	.priority = 128,
+ };
+ 
++static void scm_disable_sdi(void)
++{
++	int ret;
++	struct scm_desc desc = {
++		.args[0] = 1,
++		.args[1] = 0,
++		.arginfo = SCM_ARGS(2),
++	};
++
++	/* Needed to bypass debug image on some chips */
++	if (!is_scm_armv8())
++		ret = scm_call_atomic2(SCM_SVC_BOOT,
++				SCM_WDOG_DEBUG_BOOT_PART, 1, 0);
++	else
++		ret = scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_BOOT,
++				SCM_WDOG_DEBUG_BOOT_PART), &desc);
++	if (ret)
++		pr_err("Failed to disable secure wdog debug: %d\n", ret);
++}
++
++/*
++ * Force the SPMI PMIC arbiter to shutdown so that no more SPMI transactions
++ * are sent from the MSM to the PMIC.  This is required in order to avoid an
++ * SPMI lockup on certain PMIC chips if PS_HOLD is lowered in the middle of
++ * an SPMI transaction.
++ */
++static void halt_spmi_pmic_arbiter(void)
++{
++	struct scm_desc desc = {
++		.args[0] = 0,
++		.arginfo = SCM_ARGS(1),
++	};
++
++	if (scm_pmic_arbiter_disable_supported) {
++		pr_crit("Calling SCM to disable SPMI PMIC arbiter\n");
++		if (!is_scm_armv8())
++			scm_call_atomic1(SCM_SVC_PWR,
++						SCM_IO_DISABLE_PMIC_ARBITER, 0);
++		else
++			scm_call2_atomic(SCM_SIP_FNID(SCM_SVC_PWR,
++					SCM_IO_DISABLE_PMIC_ARBITER), &desc);
++	}
++}
++
+ static void do_msm_poweroff(void)
+ {
++	scm_disable_sdi();
++	halt_spmi_pmic_arbiter();
+ 	deassert_pshold(&restart_nb, 0, NULL);
+ }
+ 
++static void do_msm_restart(enum reboot_mode reboot_mode, const char *cmd)
++{
++	do_msm_poweroff();
++}
++
+ static int msm_restart_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -46,6 +106,10 @@ static int msm_restart_probe(struct plat
+ 	register_restart_handler(&restart_nb);
+ 
+ 	pm_power_off = do_msm_poweroff;
++	arm_pm_restart = do_msm_restart;
++
++	if (scm_is_call_available(SCM_SVC_PWR, SCM_IO_DISABLE_PMIC_ARBITER) > 0)
++		scm_pmic_arbiter_disable_supported = true;
+ 
+ 	return 0;
+ }

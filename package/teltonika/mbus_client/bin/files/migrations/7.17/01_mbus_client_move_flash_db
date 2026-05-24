@@ -1,0 +1,20 @@
+#!/bin/sh
+
+. /lib/functions.sh
+
+OLD_PATH="/usr/local/share/mbus_db"
+NEW_PATH="/usr/local/share/mbus_client/mbus_db"
+
+migrate_data_sender_mbus_db() {
+	local section="$1"
+	local mbus_db
+
+	config_get mbus_db "$section" mbus_db
+	if [ "$mbus_db" == "$OLD_PATH" ]; then
+		uci_set data_sender "$section" mbus_db "$NEW_PATH"
+	fi
+}
+
+config_load data_sender || exit 0
+config_foreach migrate_data_sender_mbus_db input
+uci_commit data_sender

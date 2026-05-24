@@ -1,0 +1,35 @@
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -44,4 +44,7 @@ ifdef CONFIG_MSM_SUBSYSTEM_RESTART
+        obj-y += microdump_collector.o
+ endif
+ 
++obj-$(CONFIG_MSM_BOOT_STATS) += boot_stats.o
++obj-$(CONFIG_MSM_BOOT_TIME_MARKER) += boot_marker.o
++
+ CFLAGS_scm.o :=$(call as-instr,.arch_extension sec,-DREQUIRES_SEC=1)
+--- a/drivers/soc/qcom/Kconfig
++++ b/drivers/soc/qcom/Kconfig
+@@ -315,4 +315,22 @@ config MSM_SUBSYSTEM_RESTART
+          It also notifies userspace of transitions between these states via
+          sysfs.
+ 
++config MSM_BOOT_STATS
++        bool "Use MSM boot stats reporting"
++        help
++          Use this to report msm boot stats such as bootloader throughput,
++          display init, total boot time.
++          This figures are reported in mpm sleep clock cycles and have a
++          resolution of 31 bits as 1 bit is used as an overflow check.
++
++config MSM_BOOT_TIME_MARKER
++        bool "Use MSM boot time marker reporting"
++        depends on MSM_BOOT_STATS
++        help
++         Use this to mark msm boot kpi for measurement.
++         An instrumentation for boot time measurement.
++         To create an entry, call "place_marker" function.
++         At userspace, write marker name to "/sys/kernel/debug/bootkpi/kpi_values"
++         If unsure, say N
++
+ endmenu

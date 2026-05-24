@@ -1,0 +1,153 @@
+Index: qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+===================================================================
+--- qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26.orig/qmiserial2qmuxd.c
++++ qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+@@ -22,6 +22,9 @@
+ #pragma ide diagnostic ignored "OCUnusedGlobalDeclarationInspection"
+ */
+ 
++#define _DEFAULT_SOURCE
++#define _BSD_SOURCE
++
+ #include <unistd.h>
+ #include <stdint.h>
+ #include <stdio.h>
+@@ -36,6 +39,9 @@
+ #include <inttypes.h>
+ #include <sys/ioctl.h>
+ #include <sys/uio.h>
++#include <sys/select.h>
++#include <termios.h>
++#include <pty.h>
+ 
+ #ifdef ANDROID
+ #include <termio.h>
+@@ -57,6 +63,9 @@ typedef int err_t;
+ #define LOG(fmt, ...) do { fprintf(stderr, "%s: " fmt "\n", __FUNCTION__, ##__VA_ARGS__); } while(0)
+ #endif
+ 
++#undef max
++#define max(x,y) ((x) > (y) ? (x) : (y))
++
+ struct serial_hdr {
+ 	uint16_t len;
+ 	uint8_t flags;
+@@ -113,6 +122,9 @@ int g_qmuxd_socket;
+ uint32_t g_qmuxd_client_id;
+ int g_serialfd_r, g_serialfd_w;
+ 
++pthread_cond_t g_ready = PTHREAD_COND_INITIALIZER;
++pthread_mutex_t g_mutex = PTHREAD_MUTEX_INITIALIZER;
++
+ bool_t writeall(int fd, const void *buf, size_t len) ;
+ bool_t writevall(int fd, const struct iovec *iov, int iovcnt) ;
+ 
+@@ -313,6 +325,88 @@ close_and_return_errno:
+ 	return err;
+ }
+ 
++void *pty_worker(void *_unused __unused) {
++	char name[256];
++	fd_set rfd;
++	struct termios tt = { 0 };
++	int master[2], slave[2];
++	int n, nfds, cc;
++	uint8_t buf[BUFSIZ];
++	char tmp[128];
++
++	cfmakeraw (&tt);
++
++	for (int i = 0; i < 2; i++) {
++		if (openpty (&master[i], &slave[i], name, &tt, NULL) < 0) {
++			LOG("cannot open pty %s", name);
++			return NULL;
++		}
++
++		// 1st pty will be ours
++		// 2nd will be symlinked at /dev/cdc-wdm0
++		if (i == 0) {
++			// let's open for reading/writing
++			g_serialfd_r = open(name, O_RDWR);
++			if (g_serialfd_r == -1) {
++				LOG("cannot open pty %s for read-write", name);
++				return NULL;
++			}
++
++			// use the same for writing
++			g_serialfd_w = g_serialfd_r;
++		} else {
++			snprintf(tmp, sizeof(tmp), "ln -sf %s /dev/cdc-wdm0", name);
++			system(tmp);
++		}
++	}
++
++	// notify that ptys are ready
++	pthread_mutex_lock(&g_mutex);
++	pthread_cond_signal(&g_ready);
++	pthread_mutex_unlock(&g_mutex);
++
++	for (;;) {
++		FD_ZERO(&rfd);
++		FD_SET(master[0], &rfd);
++		FD_SET(master[1], &rfd);
++		nfds = max(master[0], master[1]) + 1;
++		n = select(nfds, &rfd, 0, 0, NULL);
++
++		if (n > 0 || errno == EINTR) {
++			if (FD_ISSET(master[0], &rfd)) {
++				if ((cc = read(master[0], buf, sizeof(buf))) > 0) {
++					write(master[1], buf, cc);
++				}
++			}
++
++			if (FD_ISSET(master[1], &rfd)) {
++				if ((cc = read(master[1], buf, sizeof(buf))) > 0) {
++					write(master[0], buf, cc);
++				}
++			}
++		}
++	}
++
++	return NULL;
++}
++
++
++err_t create_pty_dev() {
++	err_t err;
++	pthread_t pty_thread;
++
++	if ((err = pthread_create(&pty_thread, NULL, pty_worker, NULL))) {
++		LOG("error creating pty worker thread: %s", strerror(err));
++		goto return_errno;
++	}
++
++	return 0;
++
++return_errno:
++	err = errno;
++	return err;
++}
++
+ int main(__unused int argc, __unused char *argv[]) {
+ 	err_t err;
+ 	if ((err = open_qmuxd_socket())) {
+@@ -338,8 +432,17 @@ int main(__unused int argc, __unused cha
+ 	 */
+ #endif
+ 
+-	g_serialfd_r = STDIN_FILENO;
+-	g_serialfd_w = STDOUT_FILENO;
++	if ((err = create_pty_dev())) {
++		LOG("error creating pty devices: %s", strerror(err));
++		return 1;
++	}
++
++	// wait for pty initialization
++	pthread_mutex_lock(&g_mutex);
++	pthread_cond_wait(&g_ready, &g_mutex);
++	pthread_mutex_unlock(&g_mutex);
++
++	LOG("received pty acknowledge");
+ 
+ 	pthread_t socket_read_thread;
+ 	if ((err = pthread_create(&socket_read_thread, NULL, qmuxd_read_loop, NULL))) {

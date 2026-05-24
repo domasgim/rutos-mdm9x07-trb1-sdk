@@ -1,0 +1,28 @@
+--- a/drivers/input/misc/Makefile
++++ b/drivers/input/misc/Makefile
+@@ -59,6 +59,7 @@ obj-$(CONFIG_INPUT_PCSPKR)		+= pcspkr.o
+ obj-$(CONFIG_INPUT_PM8941_PWRKEY)	+= pm8941-pwrkey.o
+ obj-$(CONFIG_INPUT_PM8XXX_VIBRATOR)	+= pm8xxx-vibrator.o
+ obj-$(CONFIG_INPUT_PMIC8XXX_PWRKEY)	+= pmic8xxx-pwrkey.o
++obj-$(CONFIG_INPUT_QPNP_POWER_ON)       += qpnp-power-on.o
+ obj-$(CONFIG_INPUT_POWERMATE)		+= powermate.o
+ obj-$(CONFIG_INPUT_PWM_BEEPER)		+= pwm-beeper.o
+ obj-$(CONFIG_INPUT_PWM_VIBRA)		+= pwm-vibra.o
+--- a/drivers/input/misc/Kconfig
++++ b/drivers/input/misc/Kconfig
+@@ -175,6 +175,15 @@ config INPUT_PMIC8XXX_PWRKEY
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called pmic8xxx-pwrkey.
+ 
++config INPUT_QPNP_POWER_ON
++        tristate "QPNP PMIC Power-on support"
++        depends on SPMI
++        help
++          This option enables device driver support for the power-on
++          functionality of Qualcomm Technologies, Inc. PNP PMICs.  It supports
++          reporting the change in status of the KPDPWR_N line (connected to the
++          power-key) as well as reset features.
++
+ config INPUT_SPARCSPKR
+ 	tristate "SPARC Speaker support"
+ 	depends on PCI && SPARC64

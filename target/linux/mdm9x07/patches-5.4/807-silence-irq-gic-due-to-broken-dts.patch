@@ -1,0 +1,20 @@
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -1010,7 +1010,7 @@ static int gic_irq_domain_translate(stru
+ 		*type = fwspec->param[2] & IRQ_TYPE_SENSE_MASK;
+ 
+ 		/* Make it clear that broken DTs are... broken */
+-		WARN_ON(*type == IRQ_TYPE_NONE);
++		// WARN_ON(*type == IRQ_TYPE_NONE);
+ 		return 0;
+ 	}
+ 
+@@ -1021,7 +1021,7 @@ static int gic_irq_domain_translate(stru
+ 		*hwirq = fwspec->param[0];
+ 		*type = fwspec->param[1];
+ 
+-		WARN_ON(*type == IRQ_TYPE_NONE);
++		// WARN_ON(*type == IRQ_TYPE_NONE);
+ 		return 0;
+ 	}
+ 

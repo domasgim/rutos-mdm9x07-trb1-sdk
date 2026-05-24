@@ -1,0 +1,13 @@
+config BUILD_BOOTLOADER
+	bool
+	depends on TARGET_mdm9x07
+	default BUILD_FACTORY_IMAGE
+	select PACKAGE_aboot-mdm9x07
+
+config TARGET_TRB14X_SELECT_MULTI_DEVICE
+	bool
+	depends on TARGET_mdm9x07
+	default BUILD_FACTORY_IMAGE
+	select USE_MULTI_PROFILE
+	select TARGET_MULTI_PROFILE
+	select TARGET_ALL_PROFILES

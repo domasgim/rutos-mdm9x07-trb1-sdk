@@ -1,0 +1,28 @@
+--- a/drivers/devfreq/Makefile
++++ b/drivers/devfreq/Makefile
+@@ -6,6 +6,7 @@ obj-$(CONFIG_DEVFREQ_GOV_PERFORMANCE)	+=
+ obj-$(CONFIG_DEVFREQ_GOV_POWERSAVE)	+= governor_powersave.o
+ obj-$(CONFIG_DEVFREQ_GOV_USERSPACE)	+= governor_userspace.o
+ obj-$(CONFIG_DEVFREQ_GOV_PASSIVE)	+= governor_passive.o
++obj-$(CONFIG_ARM_MEMLAT_MON)            += arm-memlat-mon.o
+ 
+ # DEVFREQ Drivers
+ obj-$(CONFIG_ARM_EXYNOS_BUS_DEVFREQ)	+= exynos-bus.o
+--- a/drivers/devfreq/Kconfig
++++ b/drivers/devfreq/Kconfig
+@@ -74,6 +74,15 @@ config DEVFREQ_GOV_PASSIVE
+ 	  through sysfs entries. The passive governor recommends that
+ 	  devfreq device uses the OPP table to get the frequency/voltage.
+ 
++config ARM_MEMLAT_MON
++        tristate "ARM CPU Memory Latency monitor hardware"
++        depends on ARCH_QCOM
++        help
++          The PMU present on these ARM cores allow for the use of counters to
++          monitor the memory latency characteristics of an ARM CPU workload.
++          This driver uses these counters to implement the APIs needed by
++          the mem_latency devfreq governor.
++
+ comment "DEVFREQ Drivers"
+ 
+ config ARM_EXYNOS_BUS_DEVFREQ

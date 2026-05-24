@@ -1,0 +1,37 @@
+--- a/arch/arm/mach-qcom/Makefile
++++ b/arch/arm/mach-qcom/Makefile
+@@ -1,2 +1,4 @@
+ # SPDX-License-Identifier: GPL-2.0-only
+ obj-$(CONFIG_SMP)	+= platsmp.o
++obj-$(CONFIG_USE_OF) += board-dt.o
++obj-$(CONFIG_ARCH_MDM9607) += board-9607.o
+--- a/arch/arm/mach-qcom/Kconfig
++++ b/arch/arm/mach-qcom/Kconfig
+@@ -28,4 +28,27 @@ config ARCH_MDM9615
+ 	bool "Enable support for MDM9615"
+ 	select CLKSRC_QCOM
+ 
++config ARCH_MDM9607
++	bool "Enable support for MDM9607"
++	select REGULATOR
++	select REGULATOR_RPM_SMD
++	select HAVE_ARM_ARCH_TIMER
++	select HAVE_GENERIC_DMA_COHERENT
++	select ARCH_HAS_RESET_CONTROLLER
++	select QCOM_RPM_SMD_LEGACY
++	select PM_DEVFREQ
++	select CLKDEV_LOOKUP
++	select GENERIC_CLOCKEVENTS
++	select GENERIC_ALLOCATOR
++	select HAVE_CLK
++	select HAVE_CLK_PREPARE
++	select SOC_BUS
++	select PM_OPP
++	select SPARSE_IRQ
++	select USE_OF
++	select THERMAL_WRITABLE_TRIPS
++	select RESET_CONTROLLER
++	select MFD_CORE
++	select QCOM_SCM
++
+ endif

@@ -1,0 +1,15 @@
+Index: qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+===================================================================
+--- qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26.orig/qmiserial2qmuxd.c
++++ qmiproxy-d362b032ac8aaf8831afea840a07628acfe9b01f-2020-03-26/qmiserial2qmuxd.c
+@@ -36,7 +36,10 @@
+ #include <inttypes.h>
+ #include <sys/ioctl.h>
+ #include <sys/uio.h>
++
++#ifdef ANDROID
+ #include <termio.h>
++#endif
+ 
+ #ifndef __packed
+ #define __packed  __attribute__ ((__packed__))
